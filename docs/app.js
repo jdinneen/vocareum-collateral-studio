@@ -223,8 +223,16 @@ async function generate(event) {
     setStatus(`Done in ${(payload.duration_ms / 1000).toFixed(1)}s`, "success");
   } catch (err) {
     els.rawOutput.textContent = `Error:\n${err.message}`;
-    renderPreview(null);
+    els.previewFrame.innerHTML = `<div style="padding:24px;color:var(--coral-deep);font-size:0.95rem;line-height:1.6">
+      <strong>Generation failed</strong><br>${err.message.replace(/\n/g, "<br>")}
+    </div>`;
+    els.qualityReport.innerHTML = "";
     setStatus("Error", "error");
+    // Switch to raw text tab so the error is visible
+    document.querySelectorAll(".result-tabs .tab").forEach((t) => t.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+    document.querySelector('[data-tab="raw"]').classList.add("active");
+    document.getElementById("rawPanel").classList.add("active");
   } finally {
     setLoading(false);
   }
