@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vocareum Collateral Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <div class="brand-row">
+        <span class="brand">Vocareum</span>
+        <span class="badge">Collateral Studio</span>
+      </div>
+      <h1>Build grounded sales collateral.</h1>
+      <p class="lede">Pick a product, choose a format, describe the audience. Every claim stays inside the approved catalog.</p>
+      <p id="sourceNote" class="source-note">Loading source status&hellip;</p>
+    </header>
+
+    <section class="builder">
+      <form id="builderForm" class="form-grid">
+        <div class="field format-field">
+          <span class="label">Format</span>
+          <div id="formatPicker" class="format-picker">
+            <button type="button" class="format-option selected" data-format="one-pager">
+              <span class="format-icon">&#9634;</span>
+              <span class="format-name">One-pager</span>
+              <span class="format-desc">Hero, stats, problem, steps, proof</span>
+            </button>
+            <button type="button" class="format-option" data-format="sales-collateral">
+              <span class="format-icon">&#9638;</span>
+              <span class="format-name">Overview</span>
+              <span class="format-desc">Capabilities, buyers, proof, CTA</span>
+            </button>
+            <button type="button" class="format-option" data-format="sales-deck-brief">
+              <span class="format-icon">&#9641;</span>
+              <span class="format-name">6-slide deck</span>
+              <span class="format-desc">Presentation outline with bullets</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label" for="productSelect">Product</label>
+          <select id="productSelect" name="product" required>
+            <option value="">Select a product&hellip;</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="label" for="audienceInput">Audience</label>
+          <input id="audienceInput" name="audience" type="text" placeholder="e.g. AWS solutions architects, university CIOs, training program leads" required>
+        </div>
+
+        <div class="field full-width">
+          <label class="label" for="briefInput">Brief</label>
+          <textarea id="briefInput" name="brief" rows="5" placeholder="Describe what you need. Include context like the meeting, event, or use case this collateral is for." required></textarea>
+        </div>
+
+        <div class="field full-width">
+          <label class="label" for="constraintsInput">Extra constraints <span class="optional">(optional)</span></label>
+          <input id="constraintsInput" name="constraints" type="text" placeholder="e.g. Must mention AI Gateway integration, keep under 200 words">
+        </div>
+
+        <div class="action-row full-width">
+          <button id="generateBtn" class="btn-primary" type="submit">Generate</button>
+          <span id="statusBadge" class="status-badge">Ready</span>
+        </div>
+      </form>
+    </section>
+
+    <section id="resultSection" class="result-section hidden">
+      <div class="result-tabs">
+        <button type="button" class="tab active" data-tab="preview">Preview</button>
+        <button type="button" class="tab" data-tab="raw">Raw text</button>
+        <button type="button" class="tab" data-tab="quality">Quality</button>
+      </div>
+
+      <div id="previewPanel" class="tab-panel active">
+        <div id="previewFrame" class="preview-frame"></div>
+      </div>
+
+      <div id="rawPanel" class="tab-panel">
+        <pre id="rawOutput" class="raw-output"></pre>
+      </div>
+
+      <div id="qualityPanel" class="tab-panel">
+        <div id="qualityReport" class="quality-report"></div>
+      </div>
+
+      <div class="result-actions">
+        <button id="copyRawBtn" class="btn-secondary" type="button">Copy text</button>
+        <button id="copyHtmlBtn" class="btn-secondary" type="button">Copy HTML</button>
+        <button id="downloadBtn" class="btn-secondary" type="button">Download HTML</button>
+        <button id="improveBtn" class="btn-secondary" type="button">Improve</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
