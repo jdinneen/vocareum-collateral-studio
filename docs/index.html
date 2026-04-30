@@ -18,7 +18,16 @@
       </div>
       <h1>Build grounded one-pagers.</h1>
       <p class="lede">Choose a one-pager layout, then describe what you need. Every claim stays inside the approved catalog.</p>
-      <p id="sourceNote" class="source-note">Loading source status&hellip;</p>
+      <div class="source-bar">
+        <div>
+          <p class="source-label">Grounding source</p>
+          <p id="sourceNote" class="source-note">Loading source status&hellip;</p>
+        </div>
+        <div class="source-actions">
+          <a id="sourceLink" class="source-link hidden" href="#" target="_blank" rel="noopener noreferrer">Open source doc</a>
+          <button id="refreshSourceBtn" class="btn-secondary source-refresh" type="button">Refresh source</button>
+        </div>
+      </div>
     </header>
 
     <section class="builder">
@@ -41,8 +50,16 @@
 
         <div class="field full-width">
           <label class="label" for="briefInput">Brief <span class="required-mark">*</span></label>
-          <p class="field-note">Required. In 1-2 sentences, include the product or products, the target audience (company / industry &amp; titles), and any other context you want reflected in the one-pager.</p>
-          <textarea id="briefInput" name="brief" rows="5" placeholder="Example: Build a two-sided one-pager for AI Gateway and AI Notebook aimed at Deloitte healthcare practice leaders and enterprise training directors. This is for a follow-up after an AI workforce readiness meeting." required></textarea>
+          <div class="brief-helper">
+            <p class="brief-helper-title">Required. Keep it to 1-2 sentences and include:</p>
+            <div class="brief-helper-chips">
+              <span class="brief-chip">Product or products</span>
+              <span class="brief-chip">Target audience</span>
+              <span class="brief-chip">Context</span>
+            </div>
+            <p class="field-note">Example: AI Gateway and AI Notebook for Deloitte healthcare practice leaders and enterprise training directors, as a follow-up after an AI workforce readiness meeting.</p>
+          </div>
+          <textarea id="briefInput" name="brief" rows="5" placeholder="Describe the one-pager you want, who it is for, and the context." required></textarea>
         </div>
 
         <div class="action-row full-width">
@@ -53,6 +70,8 @@
     </section>
 
     <section id="resultSection" class="result-section hidden">
+      <div id="groundingSummary" class="grounding-summary hidden"></div>
+
       <div class="result-tabs">
         <button type="button" class="tab active" data-tab="preview">Preview</button>
         <button type="button" class="tab" data-tab="raw">Raw text</button>

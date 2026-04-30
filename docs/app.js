@@ -11,7 +11,10 @@ const els = {
   generateBtn: document.getElementById("generateBtn"),
   statusBadge: document.getElementById("statusBadge"),
   sourceNote: document.getElementById("sourceNote"),
+  sourceLink: document.getElementById("sourceLink"),
+  refreshSourceBtn: document.getElementById("refreshSourceBtn"),
   resultSection: document.getElementById("resultSection"),
+  groundingSummary: document.getElementById("groundingSummary"),
   previewFrame: document.getElementById("previewFrame"),
   rawOutput: document.getElementById("rawOutput"),
   qualityReport: document.getElementById("qualityReport"),
@@ -24,6 +27,7 @@ const els = {
 let selectedSide = "one-sided";
 let lastResult = null;
 let knownProducts = [];
+let sourceMeta = null;
 
 // -- One-pager side picker --------------------------------------------------
 
@@ -56,24 +60,48 @@ function setStatus(text, tone) {
 function setLoading(on) {
   els.generateBtn.disabled = on;
   els.improveBtn.disabled = on;
+  els.refreshSourceBtn.disabled = on;
   setStatus(on ? "Generating\u2026" : "Ready", on ? "working" : "success");
 }
 
 // -- Load metadata ----------------------------------------------------------
 
-async function loadMeta() {
+function renderSourceMeta(meta, checkedAt = new Date()) {
+  sourceMeta = meta;
+  const source = meta?.source || {};
+  const mode = meta?.grounding_mode || "unknown";
+  const checkedLabel = checkedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const reviewText = source.last_reviewed ? `Last reviewed ${source.last_reviewed}.` : "Last reviewed date unavailable.";
+  const modeText = mode === "live" ? "Live source confirmed." : "Using fallback source snapshot.";
+  els.sourceNote.textContent = `${modeText} ${reviewText} Checked ${checkedLabel}.`;
+
+  if (source.doc_url) {
+    els.sourceLink.href = source.doc_url;
+    els.sourceLink.classList.remove("hidden");
+  } else {
+    els.sourceLink.classList.add("hidden");
+  }
+
+  knownProducts = meta.products || [];
+  setStatus(mode === "live" ? "Ready" : "Using fallback source", mode === "live" ? "success" : "error");
+}
+
+async function loadMeta(options = {}) {
+  const { force = false, silent = false } = options;
   try {
-    const res = await fetch(`${API}/api/meta`);
+    if (!silent) {
+      setStatus(force ? "Refreshing source\u2026" : "Checking source\u2026", "working");
+    }
+    const url = force ? `${API}/api/meta?ts=${Date.now()}` : `${API}/api/meta`;
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("Failed to load metadata.");
     const meta = await res.json();
-
-    els.sourceNote.textContent = meta.grounding_mode === "live"
-      ? `Grounded in the live catalog. Last reviewed ${meta.source.last_reviewed}.`
-      : "Using fallback source snapshot (live source unavailable).";
-    knownProducts = meta.products || [];
+    renderSourceMeta(meta, new Date());
+    return meta;
   } catch (err) {
     els.sourceNote.textContent = `Source status unavailable: ${err.message}`;
     setStatus("Offline", "error");
+    throw err;
   }
 }
 
@@ -159,6 +187,28 @@ function renderPreview(htmlContent) {
   iframe.srcdoc = htmlContent;
 }
 
+function renderGroundingSummary(payload) {
+  const docUrl = sourceMeta?.source?.doc_url;
+  const mode = payload?.grounding_mode || sourceMeta?.grounding_mode || "unknown";
+  const warnings = payload?.grounding_warnings || [];
+  const sourceTitle = payload?.source_title || sourceMeta?.source?.title || "Source";
+  const lastReviewed = payload?.source_last_reviewed || sourceMeta?.source?.last_reviewed || "unknown";
+  const badgeClass = mode === "live" ? "live" : "fallback";
+  const linkedTitle = docUrl
+    ? `<a href="${docUrl}" target="_blank" rel="noopener noreferrer">${sourceTitle}</a>`
+    : sourceTitle;
+
+  els.groundingSummary.innerHTML = `
+    <div class="grounding-summary-top">
+      <p class="grounding-summary-title">Grounded for this run</p>
+      <span class="grounding-summary-badge ${badgeClass}">${mode}</span>
+    </div>
+    <p class="grounding-summary-copy">Source: ${linkedTitle}. Last reviewed ${lastReviewed}. ${payload?.request_id ? `Request ID: ${payload.request_id}.` : ""}</p>
+    ${warnings.length ? `<ul class="grounding-warning-list">${warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul>` : ""}
+  `;
+  els.groundingSummary.classList.remove("hidden");
+}
+
 // -- Request shaping --------------------------------------------------------
 
 function normalizeText(value) {
@@ -216,6 +266,7 @@ async function generate(event) {
   setLoading(true);
   els.resultSection.classList.remove("hidden");
   els.rawOutput.textContent = "Generating\u2026";
+  els.groundingSummary.classList.add("hidden");
   renderPreview(null);
 
   // Activate preview tab
@@ -225,6 +276,7 @@ async function generate(event) {
   document.getElementById("previewPanel").classList.add("active");
 
   try {
+    await loadMeta({ force: true, silent: true });
     const res = await fetch(`${API}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -235,6 +287,7 @@ async function generate(event) {
 
     lastResult = payload;
     els.rawOutput.textContent = payload.output;
+    renderGroundingSummary(payload);
 
     if (payload.rendered_html) {
       renderPreview(payload.rendered_html);
@@ -250,6 +303,7 @@ async function generate(event) {
     els.previewFrame.innerHTML = `<div style="padding:24px;color:var(--coral-deep);font-size:0.95rem;line-height:1.6">
       <strong>Generation failed</strong><br>${err.message.replace(/\n/g, "<br>")}
     </div>`;
+    els.groundingSummary.classList.add("hidden");
     els.qualityReport.innerHTML = "";
     setStatus("Error", "error");
     // Switch to raw text tab so the error is visible
@@ -278,6 +332,7 @@ async function improve() {
   setLoading(true);
 
   try {
+    await loadMeta({ force: true, silent: true });
     const res = await fetch(`${API}/api/improve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -293,6 +348,7 @@ async function improve() {
 
     lastResult = payload;
     els.rawOutput.textContent = payload.output;
+    renderGroundingSummary(payload);
 
     if (payload.rendered_html) {
       renderPreview(payload.rendered_html);
@@ -304,6 +360,7 @@ async function improve() {
 
     setStatus(`Improved in ${(payload.duration_ms / 1000).toFixed(1)}s`, "success");
   } catch (err) {
+    els.groundingSummary.classList.add("hidden");
     setStatus("Improve failed", "error");
   } finally {
     setLoading(false);
@@ -349,5 +406,12 @@ els.copyHtmlBtn.addEventListener("click", () => {
   if (lastResult && lastResult.rendered_html) copyText(lastResult.rendered_html, els.copyHtmlBtn);
 });
 els.downloadBtn.addEventListener("click", downloadHtml);
+els.refreshSourceBtn.addEventListener("click", async () => {
+  try {
+    await loadMeta({ force: true });
+  } catch (_) {
+    // Status is already handled in loadMeta.
+  }
+});
 
-loadMeta();
+loadMeta({ force: true }).catch(() => {});
