@@ -29,6 +29,15 @@ let lastResult = null;
 let knownProducts = [];
 let sourceMeta = null;
 
+const PRODUCT_ALIASES = [
+  { canonical: "AI Gateway", patterns: ["ai gateway"] },
+  { canonical: "AI Notebook", patterns: ["ai notebook", "ai notebooks", "notebook", "notebooks"] },
+  { canonical: "GPU & CPU Compute", patterns: ["gpu & cpu compute", "gpu compute", "gpu", "gpus", "cpu compute"] },
+  { canonical: "Cloud Labs", patterns: ["cloud labs", "cloud lab", "labs"] },
+];
+
+const RUN_GUARDRAILS = "Use only approved Vocareum product names, proof points, and references from the source catalog. Do not invent named proof headings, customer examples, frameworks, or capability labels.";
+
 // -- One-pager side picker --------------------------------------------------
 
 els.sidePicker.addEventListener("click", (e) => {
@@ -102,12 +111,22 @@ async function loadMeta(options = {}) {
     renderSourceMeta(meta, new Date());
     return meta;
   } catch (err) {
+    sourceMeta = null;
+    knownProducts = [];
     els.sourceNote.textContent = `Source status unavailable: ${err.message}`;
     els.sourceLink.hidden = true;
     els.sourceLink.setAttribute("aria-disabled", "true");
     els.sourceLink.removeAttribute("href");
     setStatus("Offline", "error");
     throw err;
+  }
+}
+
+async function refreshMetaForRun() {
+  try {
+    await loadMeta({ force: true, silent: true });
+  } catch (_) {
+    // Grounding metadata is status-only here; generation should still rely on the backend.
   }
 }
 
@@ -226,8 +245,21 @@ function normalizeText(value) {
 
 function inferProductsFromBrief(brief) {
   const normalizedBrief = normalizeText(brief);
-  if (!normalizedBrief || !knownProducts.length) return [];
-  return knownProducts.filter((name) => normalizedBrief.includes(normalizeText(name)));
+  if (!normalizedBrief) return [];
+
+  const matches = new Set(
+    knownProducts.filter((name) => normalizedBrief.includes(normalizeText(name)))
+  );
+
+  PRODUCT_ALIASES.forEach((alias) => {
+    const hasCanonical = !knownProducts.length || knownProducts.includes(alias.canonical);
+    if (!hasCanonical) return;
+    if (alias.patterns.some((pattern) => normalizedBrief.includes(normalizeText(pattern)))) {
+      matches.add(alias.canonical);
+    }
+  });
+
+  return Array.from(matches);
 }
 
 function buildAudienceSummary(brief) {
@@ -254,7 +286,7 @@ function buildRequestFromForm() {
     product: matchedProducts.length ? matchedProducts.join(", ") : brief,
     audience: buildAudienceSummary(brief),
     objective: brief,
-    extra_constraints: layoutInstruction,
+    extra_constraints: `${layoutInstruction} ${RUN_GUARDRAILS}`,
   };
 }
 
@@ -282,7 +314,7 @@ async function generate(event) {
   document.getElementById("previewPanel").classList.add("active");
 
   try {
-    await loadMeta({ force: true, silent: true });
+    await refreshMetaForRun();
     const res = await fetch(`${API}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -305,6 +337,7 @@ async function generate(event) {
 
     setStatus(`Done in ${(payload.duration_ms / 1000).toFixed(1)}s`, "success");
   } catch (err) {
+    lastResult = null;
     els.rawOutput.textContent = `Error:\n${err.message}`;
     els.previewFrame.innerHTML = `<div style="padding:24px;color:var(--coral-deep);font-size:0.95rem;line-height:1.6">
       <strong>Generation failed</strong><br>${err.message.replace(/\n/g, "<br>")}
@@ -338,7 +371,7 @@ async function improve() {
   setLoading(true);
 
   try {
-    await loadMeta({ force: true, silent: true });
+    await refreshMetaForRun();
     const res = await fetch(`${API}/api/improve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -366,8 +399,18 @@ async function improve() {
 
     setStatus(`Improved in ${(payload.duration_ms / 1000).toFixed(1)}s`, "success");
   } catch (err) {
+    lastResult = null;
+    els.rawOutput.textContent = `Error:\n${err.message}`;
+    els.previewFrame.innerHTML = `<div style="padding:24px;color:var(--coral-deep);font-size:0.95rem;line-height:1.6">
+      <strong>Improve failed</strong><br>${err.message.replace(/\n/g, "<br>")}
+    </div>`;
     els.groundingSummary.classList.add("hidden");
+    els.qualityReport.innerHTML = "";
     setStatus("Improve failed", "error");
+    document.querySelectorAll(".result-tabs .tab").forEach((t) => t.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+    document.querySelector('[data-tab="raw"]').classList.add("active");
+    document.getElementById("rawPanel").classList.add("active");
   } finally {
     setLoading(false);
   }
