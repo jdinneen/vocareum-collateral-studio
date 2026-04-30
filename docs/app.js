@@ -763,7 +763,12 @@ function renderQuoteBlock(quote) {
 }
 
 function buildReferenceHeader(meta, labelText) {
-  const productLabel = meta.products.length ? meta.products.join(" + ") : "Vocareum One-Pager";
+  const products = Array.isArray(meta?.products)
+    ? meta.products
+    : Array.isArray(meta?.matchedProducts)
+      ? meta.matchedProducts
+      : [];
+  const productLabel = products.length ? products.join(" + ") : "Vocareum One-Pager";
   return `
     <div class="header">
       <div class="brand">Vocareum | ${escapeHtml(productLabel)}</div>
@@ -951,6 +956,52 @@ function inferProductsFromBrief(brief) {
   return Array.from(matches);
 }
 
+function inferAudienceFromBrief(brief, matchedProducts = []) {
+  const condensed = String(brief || "").replace(/\s+/g, " ").trim();
+  if (!condensed) return "";
+
+  const patterns = [
+    /\baimed at\s+(.+?)(?=\b(?:for|aimed at|targeted at|targeting)\b|[,.;]|$)/ig,
+    /\btargeted at\s+(.+?)(?=\b(?:for|aimed at|targeted at|targeting)\b|[,.;]|$)/ig,
+    /\btargeting\s+(.+?)(?=\b(?:for|aimed at|targeted at|targeting)\b|[,.;]|$)/ig,
+    /\bfor\s+(.+?)(?=\b(?:for|aimed at|targeted at|targeting)\b|[,.;]|$)/ig,
+  ];
+  const genericTokens = new Set([
+    "a", "an", "and", "asset", "brief", "build", "collateral", "concise", "content",
+    "create", "deck", "need", "one", "page", "pager", "packet", "sales", "sentence",
+    "sentences", "sheet", "sheeter", "short", "side", "sided", "simulation",
+    "simulations", "the", "this", "two", "write",
+  ]);
+  const candidates = [];
+
+  patterns.forEach((pattern) => {
+    for (const match of condensed.matchAll(pattern)) {
+      const candidate = String(match[1] || "")
+        .replace(/^(?:a|an|the)\s+/i, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/[,:;.-]+$/g, "")
+        .trim();
+      if (candidate) {
+        candidates.push({ index: match.index || 0, candidate });
+      }
+    }
+  });
+
+  const normalizedProducts = matchedProducts.map((product) => normalizeText(product));
+  candidates.sort((a, b) => b.index - a.index);
+  for (const item of candidates) {
+    const normalized = normalizeText(item.candidate);
+    if (!normalized || normalized.length < 3) continue;
+    if (normalizedProducts.includes(normalized)) continue;
+    const tokens = normalized.split(" ").filter(Boolean);
+    if (tokens.length && tokens.every((token) => genericTokens.has(token))) continue;
+    return item.candidate;
+  }
+
+  return "";
+}
+
 function buildRequestFromForm() {
   const brief = els.brief.value.trim();
   if (!brief) {
@@ -965,12 +1016,13 @@ function buildRequestFromForm() {
   return {
     asset_type: "one-pager",
     product: matchedProducts.length ? matchedProducts.join(", ") : brief,
-    audience: "",
+    audience: inferAudienceFromBrief(brief, matchedProducts),
     objective: `Create a concise one-pager content packet based on this brief: ${brief}`,
     extra_constraints: buildStructuredPacketConstraints(selectedSide),
     _meta: {
       brief,
       matchedProducts,
+      products: matchedProducts,
       side: selectedSide,
     },
   };
