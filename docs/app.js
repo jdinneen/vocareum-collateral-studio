@@ -951,10 +951,6 @@ function inferProductsFromBrief(brief) {
   return Array.from(matches);
 }
 
-function buildAudienceSummary(brief) {
-  return brief.replace(/\s+/g, " ").trim().slice(0, 200);
-}
-
 function buildRequestFromForm() {
   const brief = els.brief.value.trim();
   if (!brief) {
@@ -969,7 +965,7 @@ function buildRequestFromForm() {
   return {
     asset_type: "one-pager",
     product: matchedProducts.length ? matchedProducts.join(", ") : brief,
-    audience: buildAudienceSummary(brief),
+    audience: "",
     objective: `Create a concise one-pager content packet based on this brief: ${brief}`,
     extra_constraints: buildStructuredPacketConstraints(selectedSide),
     _meta: {
