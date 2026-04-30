@@ -30,10 +30,19 @@ let knownProducts = [];
 let sourceMeta = null;
 
 const PRODUCT_ALIASES = [
-  { canonical: "AI Gateway", patterns: ["ai gateway"] },
-  { canonical: "AI Notebook", patterns: ["ai notebook", "ai notebooks", "notebook", "notebooks"] },
+  { canonical: "AI Compass", patterns: ["ai compass", "compass"] },
+  { canonical: "AI Gateway", patterns: ["ai gateway", "gateway"] },
+  { canonical: "AI Notebook", patterns: ["ai notebook", "ai notebooks", "notebook", "notebooks", "vnb"] },
+  { canonical: "Agentic AI Labs", patterns: ["agentic ai labs", "agentic ai lab", "agentic labs", "agentic lab"] },
   { canonical: "GPU & CPU Compute", patterns: ["gpu & cpu compute", "gpu compute", "gpu", "gpus", "cpu compute"] },
   { canonical: "Cloud Labs", patterns: ["cloud labs", "cloud lab", "labs"] },
+  { canonical: "Cyber Ranges", patterns: ["cyber ranges", "cyber range"] },
+  { canonical: "Databases", patterns: ["database", "databases"] },
+  { canonical: "Developer Workspaces", patterns: ["developer workspaces", "developer workspace", "workspace", "workspaces"] },
+  { canonical: "On-the-Fly Labs", patterns: ["on-the-fly labs", "on the fly labs", "otf labs", "otf lab"] },
+  { canonical: "Platform Enablement Labs", patterns: ["platform enablement labs", "platform enablement lab", "enablement labs", "enablement lab"] },
+  { canonical: "Simulations", patterns: ["simulation", "simulations"] },
+  { canonical: "Virtual Desktop", patterns: ["virtual desktop", "virtual desktops"] },
 ];
 
 const RUN_GUARDRAILS = "Use only approved Vocareum product names, proof points, and references from the source catalog. Do not invent named proof headings, customer examples, frameworks, or capability labels.";
@@ -225,6 +234,9 @@ function renderGroundingSummary(payload) {
   const sourceTitle = payload?.source_title || sourceMeta?.source?.title || "Source";
   const lastReviewed = payload?.source_last_reviewed || sourceMeta?.source?.last_reviewed || "unknown";
   const badgeClass = mode === "live" ? "live" : "fallback";
+  const renderNote = payload?.render_origin === "local-reference"
+    ? " Rendered with the local reference template."
+    : "";
   const linkedTitle = docUrl
     ? `<a href="${docUrl}" target="_blank" rel="noopener noreferrer">${sourceTitle}</a>`
     : sourceTitle;
@@ -234,7 +246,7 @@ function renderGroundingSummary(payload) {
       <p class="grounding-summary-title">Grounded for this run</p>
       <span class="grounding-summary-badge ${badgeClass}">${mode}</span>
     </div>
-    <p class="grounding-summary-copy">Source: ${linkedTitle}. Last reviewed ${lastReviewed}. ${payload?.request_id ? `Request ID: ${payload.request_id}.` : ""}</p>
+    <p class="grounding-summary-copy">Source: ${linkedTitle}. Last reviewed ${lastReviewed}.${renderNote} ${payload?.request_id ? `Request ID: ${payload.request_id}.` : ""}</p>
     ${warnings.length ? `<ul class="grounding-warning-list">${warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul>` : ""}
   `;
   els.groundingSummary.classList.remove("hidden");
@@ -879,6 +891,7 @@ function applyReferenceRender(payload, requestMeta) {
     rendered_html: html,
     rendered_kind: "one-pager",
     rendered_title: packet.headline || payload.rendered_title || "vocareum_one_pager",
+    render_origin: "local-reference",
   };
 }
 
