@@ -613,12 +613,16 @@ function buildStructuredPacketConstraints(side) {
     "No markdown bold, no bullets, and no numbered lists.",
     "Use exactly these labels, one per line, in this order: Audience:, Headline:, Subhead:, Stat Bar:, Problem:, How It Works:, Who Uses This:, Proof:, CTA:.",
     "For Audience use one short line beginning with For ...",
+    "Headline must be 12 words or fewer.",
+    "Subhead must be one sentence and fit in 24 words or fewer.",
+    "Problem must be 2 short sentences or fewer.",
     `For Stat Bar use ${statCount} entries separated by | in the format value - label.`,
     "For How It Works use 3 short actions separated by |.",
-    "For Who Uses This use 1 to 3 specific buyer or operator entries separated by |. Do not use generic labels like learners, researchers, technical teams, or business teams.",
-    `For Proof use ${proofCount} approved named public proof entries separated by | in the format reference - what it proves.`,
+    "For Who Uses This use 1 to 3 specific buyer or operator entries separated by |. Prefer the format persona::specific use case. Do not use generic labels like learners, researchers, technical teams, or business teams.",
+    `For Proof use ${proofCount} approved named public proof entries separated by | in the format reference - specific takeaway sentence.`,
     "If there is no approved named public proof, write Proof: None.",
     "Never use source docs, catalog dates, workflow/category labels, grounding metadata, or NAIRR references as proof.",
+    "CTA must be one short next step, not a paragraph.",
   ].join(" ");
 }
 
@@ -1056,6 +1060,272 @@ function buildReferenceStyles() {
     .secondary-hero h2 {
       margin-bottom: 8px;
     }
+    .reference-sheet {
+      padding: 0;
+      background: var(--white);
+    }
+    .reference-hero {
+      background: var(--navy);
+      color: var(--white);
+      padding: 20px 40px 16px 40px;
+    }
+    .reference-brand-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    .reference-brand {
+      font-size: 10pt;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--mist);
+    }
+    .reference-badge {
+      background: var(--coral);
+      color: var(--white);
+      font-size: 7pt;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .reference-eyebrow {
+      display: inline-block;
+      margin-bottom: 6px;
+      color: var(--mist);
+      font-size: 8pt;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .reference-hero h1 {
+      margin: 0 0 4px;
+      font-family: "Iowan Old Style", Georgia, serif;
+      font-size: 22pt;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      color: var(--white);
+    }
+    .reference-hero-subhead {
+      max-width: 92%;
+      font-size: 9.5pt;
+      line-height: 1.38;
+      color: var(--mist);
+    }
+    .reference-stat-bar {
+      background: var(--steel);
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      padding: 8px 40px;
+      color: var(--white);
+      text-align: center;
+    }
+    .reference-stat-item strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 15pt;
+      line-height: 1;
+      color: var(--coral);
+    }
+    .reference-stat-item span {
+      display: block;
+      font-size: 6.5pt;
+      line-height: 1.25;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--mist);
+    }
+    .reference-logo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 40px 4px;
+    }
+    .reference-logo-label {
+      flex-shrink: 0;
+      font-size: 7pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--steel);
+    }
+    .reference-logo-strip {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+    .reference-logo-strip img {
+      max-height: 16px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+    }
+    .reference-body {
+      padding: 10px 40px 0 40px;
+    }
+    .reference-two-col {
+      display: grid;
+      grid-template-columns: 1.03fr 0.97fr;
+      gap: 22px;
+    }
+    .reference-section-head {
+      margin: 12px 0 6px;
+      padding-bottom: 3px;
+      border-bottom: 2px solid var(--mist);
+      font-size: 9pt;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--navy);
+    }
+    .reference-section-head:first-child {
+      margin-top: 0;
+    }
+    .reference-copy {
+      margin: 0 0 4px;
+      font-size: 8pt;
+      line-height: 1.34;
+      color: var(--ink);
+    }
+    .reference-step {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 5px;
+    }
+    .reference-step-num {
+      width: 18px;
+      height: 18px;
+      margin-right: 8px;
+      margin-top: 1px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--coral);
+      color: var(--white);
+      font-size: 7.5pt;
+      font-weight: 800;
+    }
+    .reference-step-copy {
+      flex: 1;
+      font-size: 8pt;
+      line-height: 1.3;
+      color: var(--ink);
+    }
+    .reference-step-copy strong {
+      color: var(--navy);
+    }
+    .reference-quote {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-left: 3px solid var(--coral);
+      background: var(--light-gray, #efefef);
+      font-size: 8pt;
+      line-height: 1.34;
+      color: var(--navy);
+    }
+    .reference-quote em {
+      font-style: italic;
+    }
+    .reference-quote-meta {
+      display: inline-block;
+      margin-top: 3px;
+      font-size: 7.5pt;
+      font-weight: 700;
+      color: var(--coral);
+    }
+    .reference-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 7.5pt;
+      margin-top: 2px;
+    }
+    .reference-table th {
+      background: var(--steel);
+      color: var(--white);
+      text-align: left;
+      padding: 4px 6px;
+      font-size: 7pt;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .reference-table td {
+      padding: 5px 6px;
+      border-bottom: 1px solid rgba(68, 86, 100, 0.18);
+      vertical-align: top;
+      color: var(--ink);
+    }
+    .reference-table tr:nth-child(even) td {
+      background: var(--light-gray, #efefef);
+    }
+    .reference-proof-band {
+      margin-top: 12px;
+      padding: 10px 40px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      background: var(--navy);
+      color: var(--white);
+    }
+    .reference-proof-stat {
+      flex-shrink: 0;
+      font-size: 20pt;
+      line-height: 1;
+      font-weight: 800;
+      color: var(--coral);
+    }
+    .reference-proof-copy {
+      flex: 1;
+      font-size: 7.5pt;
+      line-height: 1.35;
+      color: var(--mist);
+    }
+    .reference-proof-copy strong {
+      color: var(--white);
+    }
+    .reference-proof-divider {
+      width: 1px;
+      height: 32px;
+      background: var(--steel);
+      flex-shrink: 0;
+    }
+    .reference-proof-side {
+      flex-shrink: 0;
+      max-width: 220px;
+      font-size: 7.2pt;
+      line-height: 1.3;
+      color: var(--white);
+      text-align: right;
+    }
+    .reference-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 8px 40px 10px;
+      font-size: 7.5pt;
+      color: var(--steel);
+    }
+    .reference-footer a {
+      color: var(--coral);
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .reference-footer span:last-child {
+      max-width: 58%;
+      text-align: right;
+      line-height: 1.3;
+    }
     .footer {
       position: absolute;
       left: 0.56in;
@@ -1098,6 +1368,32 @@ function renderSteps(steps) {
   `).join("");
 }
 
+function renderReferenceStatBar(stats) {
+  return stats.map((item) => `
+    <div class="reference-stat-item">
+      <strong>${escapeHtml(item.value)}</strong>
+      <span>${escapeHtml(item.label || "Approved public stat")}</span>
+    </div>
+  `).join("");
+}
+
+function renderReferenceSteps(steps) {
+  return steps.map((step, index) => {
+    const parts = cleanText(step).split(".");
+    const lead = cleanText(parts.shift());
+    const remainder = cleanText(parts.join("."));
+    const copy = lead && remainder
+      ? `<strong>${escapeHtml(lead)}.</strong> ${escapeHtml(remainder)}`
+      : escapeHtml(cleanText(step));
+    return `
+      <div class="reference-step">
+        <div class="reference-step-num">${index + 1}</div>
+        <div class="reference-step-copy">${copy}</div>
+      </div>
+    `;
+  }).join("");
+}
+
 function renderLogoStrip(logos, tone = "dark") {
   if (!logos || !logos.length) return "";
   const logoTone = tone === "light" ? " light" : "";
@@ -1108,6 +1404,107 @@ function renderLogoStrip(logos, tone = "dark") {
           <img src="${escapeHtml(logo.url)}" alt="${escapeHtml(logo.name)}">
         </div>
       `).join("")}
+    </div>
+  `;
+}
+
+function renderReferenceLogoRow(logos) {
+  if (!logos || !logos.length) return "";
+  return `
+    <div class="reference-logo-row">
+      <div class="reference-logo-label">Trusted by</div>
+      <div class="reference-logo-strip">
+        ${logos.map((logo) => logo?.url
+          ? `<img src="${escapeHtml(logo.url)}" alt="${escapeHtml(logo.name)}">`
+          : `<span>${escapeHtml(logo.name)}</span>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function buildAudienceUseCase(packet, audience, index) {
+  if (audience.detail) return audience.detail;
+  const fromSubhead = cleanText(packet.subhead).replace(/\.$/, "");
+  if (fromSubhead) return fromSubhead;
+  const fromStep = cleanText(packet.steps?.[index] || packet.steps?.[0] || "").replace(/\.$/, "");
+  if (fromStep) return fromStep;
+  return "Grounded product fit for the requested workflow";
+}
+
+function buildAudienceRows(packet) {
+  return (packet.audiences || []).slice(0, 3).map((entry, index) => {
+    const audience = splitAudienceEntry(entry);
+    return {
+      persona: audience.title || cleanText(entry),
+      useCase: buildAudienceUseCase(packet, audience, index),
+    };
+  }).filter((row) => row.persona && row.useCase);
+}
+
+function renderAudienceTable(packet) {
+  const rows = buildAudienceRows(packet);
+  if (!rows.length) return "";
+  return `
+    <div class="reference-section-head">Who uses this</div>
+    <table class="reference-table">
+      <tr><th>Persona</th><th>Use case</th></tr>
+      ${rows.map((row) => `
+        <tr>
+          <td>${escapeHtml(row.persona)}</td>
+          <td>${escapeHtml(row.useCase)}</td>
+        </tr>
+      `).join("")}
+    </table>
+  `;
+}
+
+function buildProofSummary(packet) {
+  if (Array.isArray(packet.proofCards) && packet.proofCards.length) {
+    const card = packet.proofCards[0];
+    const useCase = cleanText(card.use_case);
+    const takeaway = cleanText(card.what_it_proves);
+    const detail = [useCase, takeaway].filter(Boolean).join(". ");
+    return {
+      lead: card.organization,
+      body: detail ? `${detail}.` : "Named public proof in the approved catalog.",
+    };
+  }
+
+  if (Array.isArray(packet.proofs) && packet.proofs.length) {
+    const proof = packet.proofs[0];
+    return {
+      lead: proof.reference,
+      body: cleanText(proof.signal) || "Named public proof in the approved catalog.",
+    };
+  }
+
+  return {
+    lead: "Vocareum at scale",
+    body: "5M+ total platform learners, 7,000+ institutions and organizations, and governed delivery across AWS, Azure, GCP, and Databricks.",
+  };
+}
+
+function pickReferenceProofStat(stats) {
+  const entries = Array.isArray(stats) ? stats : [];
+  const numeric = entries.find((item) => /\d/.test(cleanText(item?.value)));
+  if (numeric?.value) return cleanText(numeric.value);
+  const fallback = entries.find((item) => cleanText(item?.value));
+  return fallback?.value ? cleanText(fallback.value) : "2M+";
+}
+
+function buildProofSideText(packet) {
+  const items = Array.isArray(packet.credibilityBar) ? packet.credibilityBar.filter(Boolean) : [];
+  if (items.length) return items.slice(0, 3).join(" · ");
+  return "SOC 2 Type II · FERPA · GDPR";
+}
+
+function renderInlineQuote(quote) {
+  if (!quote || !quote.text) return "";
+  const meta = [quote.attribution, quote.title].filter(Boolean).join(", ");
+  return `
+    <div class="reference-quote">
+      <em>"${escapeHtml(quote.text)}"</em><br>
+      ${meta ? `<span class="reference-quote-meta">&mdash; ${escapeHtml(meta)}</span>` : ""}
     </div>
   `;
 }
@@ -1201,7 +1598,23 @@ function buildReferenceHeader(meta, labelText) {
   `;
 }
 
+function referenceProductLabel(meta) {
+  const products = Array.isArray(meta?.products)
+    ? meta.products
+    : Array.isArray(meta?.matchedProducts)
+      ? meta.matchedProducts
+      : [];
+  if (!products.length) return "Vocareum";
+  if (products.length === 1) return products[0];
+  const joined = products.join(" + ");
+  return joined.length <= 28 ? joined : products[0];
+}
+
 function renderReferenceOnePager(packet, meta) {
+  const proof = buildProofSummary(packet);
+  const proofSide = buildProofSideText(packet);
+  const badge = referenceProductLabel(meta);
+  const proofStat = pickReferenceProofStat(packet.stats);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1211,54 +1624,49 @@ function renderReferenceOnePager(packet, meta) {
   <style>${buildReferenceStyles()}</style>
 </head>
 <body>
-  <section class="page">
-    ${buildReferenceHeader(meta, "One-Sided")}
-
-    <div class="top-band">
-      <div class="hero-card">
-        ${packet.audienceEyebrow ? `<div class="eyebrow">${escapeHtml(packet.audienceEyebrow)}</div>` : ""}
-        <h1>${escapeHtml(packet.headline)}</h1>
-        <p class="subhead">${escapeHtml(packet.subhead)}</p>
-        <div class="stats">${renderStats(packet.stats)}</div>
+  <section class="page reference-sheet">
+    <div class="reference-hero">
+      <div class="reference-brand-row">
+        <span class="reference-brand">Vocareum</span>
+        <span class="reference-badge">${escapeHtml(badge)}</span>
       </div>
-      <div class="meta-card">
-        <div class="section-kicker">Selected customers and partners</div>
-        ${renderLogoStrip(packet.logoStrip)}
+      ${packet.audienceEyebrow ? `<div class="reference-eyebrow">${escapeHtml(packet.audienceEyebrow)}</div>` : ""}
+      <h1>${escapeHtml(packet.headline)}</h1>
+      <div class="reference-hero-subhead">${escapeHtml(packet.subhead)}</div>
+    </div>
+
+    <div class="reference-stat-bar">
+      ${renderReferenceStatBar(packet.stats)}
+    </div>
+
+    ${renderReferenceLogoRow(packet.logoStrip)}
+
+    <div class="reference-body">
+      <div class="reference-two-col">
+        <div>
+          <div class="reference-section-head">The problem</div>
+          <p class="reference-copy">${escapeHtml(packet.problem)}</p>
+
+          <div class="reference-section-head">How it works</div>
+          ${renderReferenceSteps(packet.steps)}
+          ${renderInlineQuote(packet.footerQuote)}
+        </div>
+        <div>
+          ${renderAudienceTable(packet)}
+        </div>
       </div>
     </div>
 
-    <div class="content-grid">
-      <div class="panel">
-        <div class="section-kicker">${escapeHtml(packet.problemHeading || "Why this matters")}</div>
-        <p>${escapeHtml(packet.problem)}</p>
-      </div>
-      <div class="panel">
-        <div class="section-kicker">Platform credibility</div>
-        ${renderCredibilityBar(packet.credibilityBar)}
-      </div>
+    <div class="reference-proof-band">
+      <div class="reference-proof-stat">${escapeHtml(proofStat)}</div>
+      <div class="reference-proof-copy"><strong>${escapeHtml(proof.lead)}.</strong> ${escapeHtml(proof.body)}</div>
+      <div class="reference-proof-divider"></div>
+      <div class="reference-proof-side">${escapeHtml(proofSide)}</div>
     </div>
 
-    <div class="content-grid">
-      <div class="panel">
-        <div class="section-kicker">${escapeHtml(packet.stepsHeading || "How Vocareum helps")}</div>
-        <div class="step-list">${renderSteps(packet.steps)}</div>
-      </div>
-      <div class="panel">
-        ${renderBestFit(packet.audiences, packet.audienceHeading)}
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="section-kicker">${escapeHtml(packet.proofHeading || "Why believe this")}</div>
-      ${renderProofCards(packet)}
-    </div>
-
-    ${renderFooterQuote(packet.footerQuote)}
-    ${renderCtaCard(packet)}
-
-    <div class="footer">
+    <div class="reference-footer">
       <a href="https://vocareum.com" target="_blank" rel="noopener noreferrer">vocareum.com</a>
-      <span>01</span>
+      <span>${escapeHtml(packet.cta)}</span>
     </div>
   </section>
 </body>
