@@ -1432,13 +1432,23 @@ function buildAudienceUseCase(packet, audience, index) {
 }
 
 function buildAudienceRows(packet) {
-  return (packet.audiences || []).slice(0, 3).map((entry, index) => {
+  const rows = (packet.audiences || []).slice(0, 3).map((entry, index) => {
     const audience = splitAudienceEntry(entry);
     return {
       persona: audience.title || cleanText(entry),
       useCase: buildAudienceUseCase(packet, audience, index),
     };
   }).filter((row) => row.persona && row.useCase);
+
+  const unique = [];
+  const seen = new Set();
+  for (const row of rows) {
+    const key = row.persona.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(row);
+  }
+  return unique;
 }
 
 function renderAudienceTable(packet) {
