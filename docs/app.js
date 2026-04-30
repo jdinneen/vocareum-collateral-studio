@@ -69,7 +69,7 @@ const PRODUCT_ALIASES = [
 ];
 
 const RUN_GUARDRAILS = "Use only approved Vocareum product names, proof points, and references from the source catalog. Do not invent named proof headings, customer examples, frameworks, or capability labels.";
-const PACKET_FIELDS = ["Headline", "Subhead", "Stat Bar", "Problem", "How It Works", "Who Uses This", "Proof", "Quote", "CTA"];
+const PACKET_FIELDS = ["Audience", "Headline", "Subhead", "Stat Bar", "Problem", "How It Works", "Who Uses This", "Proof", "Quote", "CTA"];
 const FIELD_ALIASES = {
   "Core story": "Problem",
   "Audience fit": "Who Uses This",
@@ -510,6 +510,7 @@ function parseContentPacket(text) {
   }
 
   return {
+    audienceEyebrow: cleanText(fields.Audience),
     headline: cleanText(fields.Headline),
     subhead: cleanText(fields.Subhead),
     stats: parseStatEntries(fields["Stat Bar"]).slice(0, 4),
@@ -517,8 +518,32 @@ function parseContentPacket(text) {
     steps: splitPipeEntries(fields["How It Works"]).slice(0, 4),
     audiences: splitPipeEntries(fields["Who Uses This"]).slice(0, 4),
     proofs: parseProofEntries(fields.Proof).slice(0, 4),
-    quote: cleanText(fields.Quote),
+    proofCards: [],
+    logoStrip: DEFAULT_LOGO_STRIP,
+    credibilityBar: [
+      "5M+ total platform learners",
+      "7,000+ institutions and organizations",
+      "SOC 2 Type II, FERPA, GDPR",
+      "AWS, Azure, GCP, Databricks",
+    ],
+    footerQuote: DEFAULT_FOOTER_QUOTE,
+    audienceHeading: "Best fit",
+    problemHeading: "Why this matters",
+    stepsHeading: "How Vocareum helps",
+    proofHeading: "Why believe this",
+    ctaLabel: "Next business step",
     cta: cleanText(fields.CTA),
+  };
+}
+
+function normalizeQuoteObject(value) {
+  if (!value || typeof value !== "object") return null;
+  const text = cleanText(value.text);
+  if (!text) return null;
+  return {
+    text,
+    attribution: cleanText(value.attribution),
+    title: cleanText(value.title),
   };
 }
 
@@ -527,6 +552,7 @@ function normalizeBackendPacket(packet) {
   if (!packet.headline || !packet.subhead || !packet.problem || !packet.cta) return null;
 
   return {
+    audienceEyebrow: cleanText(packet.audience_eyebrow || packet.audience),
     headline: cleanText(packet.headline),
     subhead: cleanText(packet.subhead),
     stats: Array.isArray(packet.stats)
@@ -544,42 +570,86 @@ function normalizeBackendPacket(packet) {
           signal: cleanText(item?.signal),
         })).filter((item) => item.reference).slice(0, 4)
       : [],
-    quote: cleanText(packet.quote),
+    proofCards: Array.isArray(packet.proof_cards)
+      ? packet.proof_cards.map((item) => ({
+          organization: cleanText(item?.organization),
+          relation: cleanText(item?.relation),
+          use_case: cleanText(item?.use_case),
+          what_it_proves: cleanText(item?.what_it_proves),
+          logo: item?.logo?.url ? { name: cleanText(item.logo.name), url: cleanText(item.logo.url) } : null,
+        })).filter((item) => item.organization && item.use_case && item.what_it_proves).slice(0, 3)
+      : [],
+    logoStrip: Array.isArray(packet.logo_strip)
+      ? packet.logo_strip.map((item) => ({
+          name: cleanText(item?.name),
+          url: cleanText(item?.url),
+        })).filter((item) => item.name && item.url).slice(0, 4)
+      : DEFAULT_LOGO_STRIP,
+    credibilityBar: Array.isArray(packet.credibility_bar)
+      ? packet.credibility_bar.map((item) => cleanText(item)).filter(Boolean).slice(0, 4)
+      : [
+          "5M+ total platform learners",
+          "7,000+ institutions and organizations",
+          "SOC 2 Type II, FERPA, GDPR",
+          "AWS, Azure, GCP, Databricks",
+        ],
+    footerQuote: normalizeQuoteObject(packet.footer_quote) || DEFAULT_FOOTER_QUOTE,
+    audienceHeading: cleanText(packet.audience_heading) || "Best fit",
+    problemHeading: cleanText(packet.problem_heading) || "Why this matters",
+    stepsHeading: cleanText(packet.steps_heading) || "How Vocareum helps",
+    proofHeading: cleanText(packet.proof_heading) || "Why believe this",
+    ctaLabel: cleanText(packet.cta_label) || "Next business step",
     cta: cleanText(packet.cta),
   };
 }
 
 function buildStructuredPacketConstraints(side) {
   const statCount = side === "two-sided" ? "4" : "3 or 4";
-  const proofCount = side === "two-sided" ? "3" : "2 or 3";
+  const proofCount = side === "two-sided" ? "2" : "1 or 2";
   return [
     RUN_GUARDRAILS,
     `Keep the content concise enough for a ${side === "two-sided" ? "two-sided" : "one-sided"} leave-behind.`,
     "Output plain text only.",
     "No markdown bold, no bullets, and no numbered lists.",
-    "Use exactly these labels, one per line, in this order: Headline:, Subhead:, Stat Bar:, Problem:, How It Works:, Who Uses This:, Proof:, Quote:, CTA:.",
+    "Use exactly these labels, one per line, in this order: Audience:, Headline:, Subhead:, Stat Bar:, Problem:, How It Works:, Who Uses This:, Proof:, CTA:.",
+    "For Audience use one short line beginning with For ...",
     `For Stat Bar use ${statCount} entries separated by | in the format value - label.`,
     "For How It Works use 3 short actions separated by |.",
-    "For Who Uses This use 1 to 3 audiences separated by |. If the brief names one audience, keep it to that audience and the closest matching buyer roles instead of inventing extra sectors.",
-    `For Proof use ${proofCount} approved named public proof entries separated by | in the format reference - signal.`,
+    "For Who Uses This use 1 to 3 specific buyer or operator entries separated by |. Do not use generic labels like learners, researchers, technical teams, or business teams.",
+    `For Proof use ${proofCount} approved named public proof entries separated by | in the format reference - what it proves.`,
     "If there is no approved named public proof, write Proof: None.",
-    "Never use source docs, catalog dates, workflow/category labels, or grounding metadata as proof.",
-    "If there is no approved public quote, write Quote: None.",
+    "Never use source docs, catalog dates, workflow/category labels, grounding metadata, or NAIRR references as proof.",
   ].join(" ");
 }
+
+const DEFAULT_LOGO_STRIP = [
+  { name: "University of Michigan", url: "https://www.vocareum.com/wp-content/uploads/2026/03/University-of-Michigan.png" },
+  { name: "UC San Diego", url: "https://www.vocareum.com/wp-content/uploads/2026/03/University_of_California_San_Diego_logo.svg" },
+  { name: "AWS", url: "https://www.vocareum.com/wp-content/uploads/2026/03/Amazon_Web_Services_Logo.svg" },
+  { name: "Databricks", url: "https://www.vocareum.com/wp-content/uploads/2026/03/databricks-logo.webp" },
+];
+
+const DEFAULT_FOOTER_QUOTE = {
+  text: "We've standardized on Vocareum's education technology platform for our asynchronous, instructor-led and bootcamp courses.",
+  attribution: "Rochana Golani",
+  title: "GVP, Learning & Enablement, Databricks",
+};
 
 function buildReferenceStyles() {
   return `
     :root {
-      --dark: #2e3a41;
-      --steel: #445664;
-      --powder: #c1d3dd;
-      --light: #efefef;
-      --coral: #ff7f50;
+      --navy: #253742;
+      --slate: #445664;
+      --mist: #eef3f5;
+      --paper: #f7f3eb;
+      --sand: #fbf8f2;
+      --line: #dbe3e6;
+      --coral: #eb7148;
+      --coral-soft: #fff1ea;
       --white: #ffffff;
-      --ink: #111111;
-      --paper: #f7f5f1;
-      --radius: 18px;
+      --ink: #18262e;
+      --muted: #5f7078;
+      --radius: 22px;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -593,42 +663,50 @@ function buildReferenceStyles() {
       width: 8.5in;
       min-height: 11in;
       margin: 0 auto;
-      padding: 0.5in 0.58in;
+      padding: 0.48in 0.56in 0.42in;
       position: relative;
       overflow: hidden;
-      background: var(--white);
+      background:
+        radial-gradient(circle at top right, rgba(235, 113, 72, 0.10), transparent 20rem),
+        linear-gradient(180deg, #ffffff 0%, #fbfaf7 100%);
       page-break-after: always;
     }
     .page:last-child { page-break-after: auto; }
-    .page.dark {
+    .page.secondary {
       background:
-        radial-gradient(circle at top right, rgba(255, 127, 80, 0.18), transparent 24rem),
-        linear-gradient(180deg, #36444d 0%, #273239 100%);
-      color: var(--white);
+        radial-gradient(circle at top left, rgba(193, 211, 221, 0.26), transparent 18rem),
+        linear-gradient(180deg, #f8fafb 0%, #edf3f5 100%);
     }
-    .page.dark p,
-    .page.dark li,
-    .page.dark td { color: var(--powder); }
     .header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       gap: 16px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
-    .brand {
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: 0.22em;
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      height: 18px;
+      width: auto;
+      display: block;
+    }
+    .brand-copy {
+      font-size: 11px;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: var(--steel);
+      font-weight: 800;
+      color: var(--slate);
     }
-    .page.dark .brand { color: var(--powder); }
     .label {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
       padding: 7px 14px;
       border-radius: 999px;
-      background: var(--dark);
+      background: var(--navy);
       color: var(--white);
       font-size: 11px;
       font-weight: 800;
@@ -636,55 +714,91 @@ function buildReferenceStyles() {
       text-transform: uppercase;
       white-space: nowrap;
     }
-    .page.dark .label {
-      background: var(--coral);
-      color: var(--dark);
+    .eyebrow {
+      display: inline-flex;
+      margin-bottom: 10px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--coral-soft);
+      color: var(--coral);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 800;
     }
     h1, h2 {
       margin: 0;
       font-family: "Iowan Old Style", Georgia, serif;
       letter-spacing: -0.04em;
+      color: var(--navy);
     }
     h1 {
-      font-size: 42px;
+      font-size: 40px;
       line-height: 0.96;
-      color: var(--dark);
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
     h2 {
-      font-size: 31px;
-      line-height: 1;
+      font-size: 33px;
+      line-height: 0.98;
       margin-bottom: 10px;
-      color: inherit;
     }
-    .page.dark h1,
-    .page.dark h2 { color: var(--white); }
     .subhead {
-      max-width: 6.8in;
-      font-size: 17px;
-      line-height: 1.45;
-      color: var(--steel);
-      margin-bottom: 20px;
+      max-width: 6.85in;
+      font-size: 16px;
+      line-height: 1.5;
+      color: var(--muted);
+      margin-bottom: 16px;
     }
-    .page.dark .subhead { color: var(--powder); }
+    .top-band {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .hero-card,
+    .meta-card,
+    .panel,
+    .quote-rail,
+    .cta-card {
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.9);
+    }
+    .hero-card {
+      padding: 20px 22px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 241, 234, 0.78));
+    }
+    .meta-card {
+      padding: 18px;
+      background:
+        linear-gradient(180deg, rgba(37, 55, 66, 0.98), rgba(68, 86, 100, 0.96));
+      color: var(--white);
+      border-color: rgba(37, 55, 66, 0.08);
+    }
+    .meta-card .section-kicker,
+    .meta-card p,
+    .meta-card li,
+    .meta-card strong,
+    .meta-card span { color: var(--white); }
     .stats {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-bottom: 20px;
+      gap: 10px;
+      margin-bottom: 14px;
     }
     .stat {
-      border-radius: var(--radius);
-      background: var(--light);
-      border: 1px solid #dbe1e4;
-      padding: 15px 14px 14px;
-      min-height: 92px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--line);
+      padding: 14px 13px 12px;
+      min-height: 86px;
     }
     .stat strong {
       display: block;
-      font-size: 27px;
+      font-size: 25px;
       line-height: 1;
-      color: var(--dark);
+      color: var(--navy);
       margin-bottom: 6px;
     }
     .stat span {
@@ -692,20 +806,56 @@ function buildReferenceStyles() {
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: var(--steel);
+      color: var(--muted);
       font-weight: 700;
       line-height: 1.35;
     }
-    .grid {
+    .logo-strip {
       display: grid;
-      grid-template-columns: 1.08fr 0.92fr;
-      gap: 18px;
-      margin-bottom: 18px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .logo-chip {
+      height: 62px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+    }
+    .logo-chip img {
+      max-width: 100%;
+      max-height: 28px;
+      object-fit: contain;
+      filter: brightness(0) invert(1);
+    }
+    .logo-chip.light img {
+      filter: none;
+    }
+    .credibility-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .credibility-item {
+      padding: 10px 12px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.12);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1.06fr 0.94fr;
+      gap: 14px;
+      margin-bottom: 14px;
     }
     .panel {
-      border-radius: var(--radius);
-      border: 1px solid #d9dfe3;
-      background: var(--white);
       padding: 18px;
     }
     .section-kicker {
@@ -720,41 +870,27 @@ function buildReferenceStyles() {
     .panel li {
       font-size: 14px;
       line-height: 1.48;
-      color: #253037;
+      color: var(--ink);
     }
     .panel p { margin: 0 0 10px; }
-    .panel ul {
-      margin: 0;
-      padding-left: 18px;
-    }
-    .panel li + li {
-      margin-top: 8px;
-    }
-    .page.dark .panel {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.12);
-    }
-    .page.dark .panel p,
-    .page.dark .panel li { color: var(--powder); }
     .step-list {
       display: grid;
       gap: 10px;
-      margin-top: 12px;
     }
     .step {
-      display: flex;
+      display: grid;
+      grid-template-columns: 26px 1fr;
       gap: 10px;
-      align-items: flex-start;
-      border-radius: 14px;
-      background: #f7f8f9;
-      border: 1px solid #d8dee2;
+      align-items: start;
+      border-radius: 16px;
+      background: var(--sand);
+      border: 1px solid var(--line);
       padding: 14px;
     }
     .step-num {
-      width: 24px;
-      height: 24px;
+      width: 26px;
+      height: 26px;
       border-radius: 999px;
-      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -764,134 +900,179 @@ function buildReferenceStyles() {
       font-weight: 800;
     }
     .step-copy {
+      font-size: 14px;
+      line-height: 1.44;
+      color: var(--navy);
+    }
+    .best-fit-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 10px;
+    }
+    .best-fit-item {
+      border-radius: 16px;
+      padding: 12px 14px;
+      background: var(--sand);
+      border: 1px solid var(--line);
+      font-size: 14px;
+      line-height: 1.42;
+      color: var(--ink);
+    }
+    .proof-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .proof-card {
+      border-radius: 18px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(238, 243, 245, 0.68));
+    }
+    .proof-card-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .proof-logo {
+      width: 118px;
+      height: 32px;
+      object-fit: contain;
+      object-position: left center;
+    }
+    .proof-org {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.2;
+      color: var(--navy);
+      font-weight: 800;
+    }
+    .proof-label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--coral);
+      font-weight: 800;
+    }
+    .proof-card p {
+      margin: 0 0 10px;
       font-size: 13px;
       line-height: 1.45;
-      color: var(--dark);
+      color: var(--ink);
     }
-    .audience-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 14px;
-      margin-bottom: 18px;
-    }
-    .audience-card {
+    .proof-empty {
       border-radius: 18px;
-      padding: 18px 16px;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      border: 1px dashed var(--line);
+      background: var(--sand);
+      padding: 16px;
     }
-    .audience-card h3 {
-      margin: 0 0 9px;
-      font-size: 13px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--coral);
+    .proof-empty strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 15px;
+      color: var(--navy);
     }
-    .audience-card p {
+    .proof-empty p {
       margin: 0;
       font-size: 13px;
-      line-height: 1.5;
+      line-height: 1.45;
+      color: var(--muted);
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-      line-height: 1.42;
-    }
-    th {
-      text-align: left;
-      padding: 10px 10px 8px;
-      background: var(--steel);
-      color: var(--white);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    td {
-      padding: 10px;
-      vertical-align: top;
-      border-bottom: 1px solid #dce2e5;
-      color: #253037;
-      background: rgba(255, 255, 255, 0.88);
-    }
-    tr:nth-child(even) td { background: #f7f8f9; }
-    .page.dark th {
-      background: rgba(193, 211, 221, 0.16);
-      color: var(--white);
-    }
-    .page.dark td {
-      border-bottom-color: rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.04);
-    }
-    .page.dark tr:nth-child(even) td { background: rgba(255, 255, 255, 0.03); }
-    .quote {
+    .quote-rail {
+      margin-top: 14px;
+      padding: 16px 18px;
+      background:
+        linear-gradient(90deg, rgba(235, 113, 72, 0.12), rgba(235, 113, 72, 0.03));
       border-left: 4px solid var(--coral);
-      padding: 14px 16px;
-      border-radius: 0 16px 16px 0;
-      background: rgba(193, 211, 221, 0.22);
-      margin-top: 18px;
-      margin-bottom: 18px;
     }
-    .page.dark .quote { background: rgba(255, 255, 255, 0.08); }
-    .quote p {
+    .quote-rail p {
       margin: 0 0 8px;
       font-size: 17px;
-      line-height: 1.4;
+      line-height: 1.38;
       font-family: "Iowan Old Style", Georgia, serif;
-      color: inherit;
+      color: var(--navy);
     }
-    .quote span {
+    .quote-meta {
       font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--steel);
+      line-height: 1.45;
+      color: var(--muted);
       font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
-    .page.dark .quote span { color: var(--powder); }
-    .cta {
-      margin-top: auto;
-      border-radius: 20px;
-      padding: 20px 22px;
-      background: linear-gradient(135deg, rgba(255, 127, 80, 0.95), rgba(255, 165, 120, 0.95));
-      color: var(--dark);
+    .cta-card {
+      margin-top: 14px;
+      padding: 18px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 18px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(238, 243, 245, 0.95));
     }
-    .cta strong {
+    .cta-card strong {
       display: block;
-      font-size: 22px;
+      margin-bottom: 5px;
+      font-size: 18px;
       line-height: 1;
-      margin-bottom: 6px;
       font-family: "Iowan Old Style", Georgia, serif;
+      color: var(--navy);
     }
-    .cta p {
+    .cta-card p {
       margin: 0;
       font-size: 14px;
       line-height: 1.45;
-      color: #2e3a41;
+      color: var(--ink);
     }
-    .cta .url {
-      font-size: 16px;
+    .cta-url {
+      flex-shrink: 0;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: var(--navy);
+      color: var(--white);
+      font-size: 12px;
       font-weight: 800;
-      letter-spacing: 0.04em;
-      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .secondary-grid {
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .secondary-hero {
+      margin-bottom: 14px;
+      padding: 18px 20px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.86);
+    }
+    .secondary-hero h2 {
+      margin-bottom: 8px;
     }
     .footer {
       position: absolute;
-      left: 0.58in;
-      right: 0.58in;
-      bottom: 0.36in;
+      left: 0.56in;
+      right: 0.56in;
+      bottom: 0.26in;
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.12em;
-      color: var(--steel);
+      color: var(--muted);
     }
-    .page.dark .footer { color: var(--powder); }
+    .footer a {
+      color: inherit;
+      text-decoration: none;
+    }
     @page {
       size: letter;
       margin: 0;
@@ -917,58 +1098,88 @@ function renderSteps(steps) {
   `).join("");
 }
 
-function renderAudienceCards(audiences) {
-  return audiences.map((entry) => {
-    const audience = splitAudienceEntry(entry);
-    return `
-      <div class="audience-card">
-        <h3>${escapeHtml(audience.title)}</h3>
-        ${audience.detail ? `<p>${escapeHtml(audience.detail)}</p>` : ""}
-      </div>
-    `;
-  }).join("");
-}
-
-function renderProofRows(proofs) {
-  return proofs.map((proof) => `
-    <tr>
-      <td>${escapeHtml(proof.reference)}</td>
-      <td>${escapeHtml(proof.signal)}</td>
-    </tr>
-  `).join("");
-}
-
-function renderQuoteBlock(quote) {
-  if (!quote || isNoneLike(quote)) return "";
+function renderLogoStrip(logos, tone = "dark") {
+  if (!logos || !logos.length) return "";
+  const logoTone = tone === "light" ? " light" : "";
   return `
-    <div class="quote">
-      <p>${escapeHtml(quote)}</p>
-      <span>Approved public quote</span>
+    <div class="logo-strip">
+      ${logos.map((logo) => `
+        <div class="logo-chip${logoTone}">
+          <img src="${escapeHtml(logo.url)}" alt="${escapeHtml(logo.name)}">
+        </div>
+      `).join("")}
     </div>
   `;
 }
 
-function renderAudienceSection(audiences) {
-  if (!audiences.length) return "";
+function renderCredibilityBar(items) {
+  if (!items || !items.length) return "";
   return `
-    <div class="section-kicker">Who uses this</div>
-    <ul>
-      ${audiences.map((entry) => `<li>${escapeHtml(formatAudienceInline(entry))}</li>`).join("")}
+    <ul class="credibility-list">
+      ${items.map((item) => `<li class="credibility-item">${escapeHtml(item)}</li>`).join("")}
     </ul>
   `;
 }
 
-function renderProofTable(proofs, signalLabel = "Signal") {
-  if (!proofs.length) return "";
+function renderBestFit(audiences, heading = "Best fit") {
+  if (!audiences.length) return "";
   return `
-    <div class="section-kicker" style="margin-top:16px;">Named public proof</div>
-    <table>
-      <tr>
-        <th>Reference</th>
-        <th>${escapeHtml(signalLabel)}</th>
-      </tr>
-      ${renderProofRows(proofs)}
-    </table>
+    <div class="section-kicker">${escapeHtml(heading)}</div>
+    <ul class="best-fit-list">
+      ${audiences.map((entry) => `<li class="best-fit-item">${escapeHtml(formatAudienceInline(entry))}</li>`).join("")}
+    </ul>
+  `;
+}
+
+function renderProofCards(packet) {
+  if (Array.isArray(packet.proofCards) && packet.proofCards.length) {
+    return `
+      <div class="proof-grid">
+        ${packet.proofCards.map((card) => `
+          <div class="proof-card">
+            <div class="proof-card-top">
+              ${card.logo?.url ? `<img class="proof-logo" src="${escapeHtml(card.logo.url)}" alt="${escapeHtml(card.logo.name || card.organization)}">` : ""}
+              <p class="proof-org">${escapeHtml(card.organization)}</p>
+            </div>
+            ${card.relation ? `<span class="proof-label">${escapeHtml(card.relation)}</span>` : ""}
+            <span class="proof-label">Use case</span>
+            <p>${escapeHtml(card.use_case || "")}</p>
+            <span class="proof-label">What it proves</span>
+            <p>${escapeHtml(card.what_it_proves || "")}</p>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="proof-empty">
+      <strong>No named public proof selected</strong>
+      <p>This draft leans on platform scale, compliance, and partner credibility instead of forcing a weak case-study reference.</p>
+    </div>
+  `;
+}
+
+function renderFooterQuote(quote) {
+  if (!quote || !quote.text) return "";
+  const meta = [quote.attribution, quote.title].filter(Boolean).join(" | ");
+  return `
+    <div class="quote-rail">
+      <p>"${escapeHtml(quote.text)}"</p>
+      <div class="quote-meta">${escapeHtml(meta)}</div>
+    </div>
+  `;
+}
+
+function renderCtaCard(packet) {
+  return `
+    <div class="cta-card">
+      <div>
+        <strong>${escapeHtml(packet.ctaLabel || "Next business step")}</strong>
+        <p>${escapeHtml(packet.cta)}</p>
+      </div>
+      <div class="cta-url">vocareum.com</div>
+    </div>
   `;
 }
 
@@ -981,14 +1192,16 @@ function buildReferenceHeader(meta, labelText) {
   const productLabel = products.length ? products.join(" + ") : "Vocareum One-Pager";
   return `
     <div class="header">
-      <div class="brand">Vocareum | ${escapeHtml(productLabel)}</div>
+      <div class="brand-lockup">
+        <img class="brand-logo" src="https://www.vocareum.com/wp-content/uploads/2024/06/Logo-wrap.svg" alt="Vocareum">
+        <div class="brand-copy">${escapeHtml(productLabel)}</div>
+      </div>
       <div class="label">${escapeHtml(labelText)}</div>
     </div>
   `;
 }
 
 function renderReferenceOnePager(packet, meta) {
-  const quoteBlock = renderQuoteBlock(packet.quote);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1000,36 +1213,51 @@ function renderReferenceOnePager(packet, meta) {
 <body>
   <section class="page">
     ${buildReferenceHeader(meta, "One-Sided")}
-    <h1>${escapeHtml(packet.headline)}</h1>
-    <p class="subhead">${escapeHtml(packet.subhead)}</p>
 
-    <div class="stats">${renderStats(packet.stats)}</div>
+    <div class="top-band">
+      <div class="hero-card">
+        ${packet.audienceEyebrow ? `<div class="eyebrow">${escapeHtml(packet.audienceEyebrow)}</div>` : ""}
+        <h1>${escapeHtml(packet.headline)}</h1>
+        <p class="subhead">${escapeHtml(packet.subhead)}</p>
+        <div class="stats">${renderStats(packet.stats)}</div>
+      </div>
+      <div class="meta-card">
+        <div class="section-kicker">Selected customers and partners</div>
+        ${renderLogoStrip(packet.logoStrip)}
+      </div>
+    </div>
 
-    <div class="grid">
+    <div class="content-grid">
       <div class="panel">
-        <div class="section-kicker">Problem</div>
+        <div class="section-kicker">${escapeHtml(packet.problemHeading || "Why this matters")}</div>
         <p>${escapeHtml(packet.problem)}</p>
+      </div>
+      <div class="panel">
+        <div class="section-kicker">Platform credibility</div>
+        ${renderCredibilityBar(packet.credibilityBar)}
+      </div>
+    </div>
+
+    <div class="content-grid">
+      <div class="panel">
+        <div class="section-kicker">${escapeHtml(packet.stepsHeading || "How Vocareum helps")}</div>
         <div class="step-list">${renderSteps(packet.steps)}</div>
       </div>
-
       <div class="panel">
-        ${renderAudienceSection(packet.audiences)}
-        ${renderProofTable(packet.proofs)}
+        ${renderBestFit(packet.audiences, packet.audienceHeading)}
       </div>
     </div>
 
-    ${quoteBlock}
-
-    <div class="cta">
-      <div>
-        <strong>Next step</strong>
-        <p>${escapeHtml(packet.cta)}</p>
-      </div>
-      <div class="url">vocareum.com</div>
+    <div class="panel">
+      <div class="section-kicker">${escapeHtml(packet.proofHeading || "Why believe this")}</div>
+      ${renderProofCards(packet)}
     </div>
+
+    ${renderFooterQuote(packet.footerQuote)}
+    ${renderCtaCard(packet)}
 
     <div class="footer">
-      <span>vocareum.com</span>
+      <a href="https://vocareum.com" target="_blank" rel="noopener noreferrer">vocareum.com</a>
       <span>01</span>
     </div>
   </section>
@@ -1038,7 +1266,6 @@ function renderReferenceOnePager(packet, meta) {
 }
 
 function renderReferenceTwoPager(packet, meta) {
-  const quoteBlock = renderQuoteBlock(packet.quote);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1050,53 +1277,65 @@ function renderReferenceTwoPager(packet, meta) {
 <body>
   <section class="page">
     ${buildReferenceHeader(meta, "Side 1")}
-    <h1>${escapeHtml(packet.headline)}</h1>
-    <p class="subhead">${escapeHtml(packet.subhead)}</p>
 
-    <div class="stats">${renderStats(packet.stats)}</div>
+    <div class="hero-card" style="margin-bottom:14px;">
+      ${packet.audienceEyebrow ? `<div class="eyebrow">${escapeHtml(packet.audienceEyebrow)}</div>` : ""}
+      <h1>${escapeHtml(packet.headline)}</h1>
+      <p class="subhead">${escapeHtml(packet.subhead)}</p>
+      <div class="stats">${renderStats(packet.stats)}</div>
+    </div>
 
-    <div class="grid">
+    <div class="content-grid">
       <div class="panel">
-        <div class="section-kicker">Problem</div>
+        <div class="section-kicker">${escapeHtml(packet.problemHeading || "Why this matters")}</div>
         <p>${escapeHtml(packet.problem)}</p>
       </div>
       <div class="panel">
-        ${renderAudienceSection(packet.audiences)}
+        <div class="section-kicker">Selected customers and partners</div>
+        ${renderLogoStrip(packet.logoStrip, "light")}
       </div>
     </div>
 
-    <div class="panel">
-      <div class="section-kicker">How it works</div>
-      <div class="step-list">${renderSteps(packet.steps)}</div>
+    <div class="content-grid">
+      <div class="panel">
+        <div class="section-kicker">${escapeHtml(packet.stepsHeading || "How Vocareum helps")}</div>
+        <div class="step-list">${renderSteps(packet.steps)}</div>
+      </div>
+      <div class="panel">
+        ${renderBestFit(packet.audiences, packet.audienceHeading)}
+      </div>
     </div>
 
     <div class="footer">
-      <span>vocareum.com</span>
+      <a href="https://vocareum.com" target="_blank" rel="noopener noreferrer">vocareum.com</a>
       <span>01</span>
     </div>
   </section>
 
-  <section class="page dark">
+  <section class="page secondary">
     ${buildReferenceHeader(meta, "Side 2")}
-    <h2>${escapeHtml(packet.headline)}</h2>
-    <p class="subhead">${escapeHtml(packet.subhead)}</p>
 
-    ${packet.audiences.length ? `<div class="audience-grid">${renderAudienceCards(packet.audiences)}</div>` : ""}
-
-    ${renderProofTable(packet.proofs, "What it proves")}
-
-    ${quoteBlock}
-
-    <div class="cta">
-      <div>
-        <strong>Next step</strong>
-        <p>${escapeHtml(packet.cta)}</p>
-      </div>
-      <div class="url">vocareum.com</div>
+    <div class="secondary-hero">
+      <h2>${escapeHtml(packet.headline)}</h2>
+      <p class="subhead">${escapeHtml(packet.subhead)}</p>
     </div>
 
+    <div class="secondary-grid">
+      <div class="panel">
+        <div class="section-kicker">Platform credibility</div>
+        ${renderCredibilityBar(packet.credibilityBar)}
+      </div>
+      <div class="panel">
+        <div class="section-kicker">${escapeHtml(packet.proofHeading || "Why believe this")}</div>
+        ${renderProofCards(packet)}
+      </div>
+    </div>
+
+    ${renderFooterQuote(packet.footerQuote)}
+    ${renderCtaCard(packet)}
+
     <div class="footer">
-      <span>vocareum.com</span>
+      <a href="https://vocareum.com" target="_blank" rel="noopener noreferrer">vocareum.com</a>
       <span>02</span>
     </div>
   </section>
@@ -1109,14 +1348,25 @@ function applyReferenceRender(payload, requestMeta) {
   const fallbackPacket = canonicalPacket ? null : parseContentPacket(payload.output);
   const packet = canonicalPacket || fallbackPacket;
   if (!packet) return payload;
-  const preparedPacket = canonicalPacket ? {
-    ...canonicalPacket,
-    quote: isNoneLike(canonicalPacket.quote) ? "" : canonicalPacket.quote,
-  } : {
+  const preparedPacket = canonicalPacket ? canonicalPacket : {
     ...fallbackPacket,
     audiences: sanitizeAudienceEntries(fallbackPacket.audiences, requestMeta?.audience || ""),
     proofs: sanitizeProofEntries(fallbackPacket.proofs),
-    quote: isNoneLike(fallbackPacket.quote) ? "" : fallbackPacket.quote,
+    proofCards: [],
+    logoStrip: DEFAULT_LOGO_STRIP,
+    credibilityBar: [
+      "5M+ total platform learners",
+      "7,000+ institutions and organizations",
+      "SOC 2 Type II, FERPA, GDPR",
+      "AWS, Azure, GCP, Databricks",
+    ],
+    audienceEyebrow: requestMeta?.audience ? `For ${requestMeta.audience}` : "",
+    audienceHeading: "Best fit",
+    problemHeading: "Why this matters",
+    stepsHeading: "How Vocareum helps",
+    proofHeading: "Why believe this",
+    ctaLabel: "Next business step",
+    footerQuote: DEFAULT_FOOTER_QUOTE,
   };
 
   const html = requestMeta.side === "two-sided"
