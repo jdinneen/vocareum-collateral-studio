@@ -90,14 +90,26 @@ function setLoading(on) {
 
 // -- Load metadata ----------------------------------------------------------
 
+function formatSourceTimestamp(value, options = {}) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleString([], options);
+}
+
 function renderSourceMeta(meta, checkedAt = new Date()) {
   sourceMeta = meta;
   const source = meta?.source || {};
   const mode = meta?.grounding_mode || "unknown";
-  const checkedLabel = checkedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const checkedSourceAt = formatSourceTimestamp(source.checked_at, { hour: "numeric", minute: "2-digit" });
+  const checkedLabel = checkedSourceAt || checkedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const reviewText = source.last_reviewed ? `Last reviewed ${source.last_reviewed}.` : "Last reviewed date unavailable.";
+  const versionText = source.version && source.version !== "Unknown" ? ` Version ${source.version}.` : "";
+  const modifiedText = source.modified_time && source.modified_time !== "Unknown"
+    ? ` Updated ${formatSourceTimestamp(source.modified_time, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`
+    : "";
   const modeText = mode === "live" ? "Live source confirmed." : "Using fallback source snapshot.";
-  els.sourceNote.textContent = `${modeText} ${reviewText} Checked ${checkedLabel}.`;
+  els.sourceNote.textContent = `${modeText} ${reviewText}${versionText}${modifiedText} Checked ${checkedLabel}.`;
 
   if (source.doc_url) {
     els.sourceLink.href = source.doc_url;
@@ -119,8 +131,18 @@ async function loadMeta(options = {}) {
     if (!silent) {
       setStatus(force ? "Refreshing source\u2026" : "Checking source\u2026", "working");
     }
-    const url = force ? `${API}/api/meta?ts=${Date.now()}` : `${API}/api/meta`;
-    const res = await fetch(url, { cache: "no-store" });
+    let res;
+    if (force) {
+      res = await fetch(`${API}/api/source/refresh`, {
+        method: "POST",
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        res = await fetch(`${API}/api/meta?force=true&ts=${Date.now()}`, { cache: "no-store" });
+      }
+    } else {
+      res = await fetch(`${API}/api/meta`, { cache: "no-store" });
+    }
     if (!res.ok) throw new Error("Failed to load metadata.");
     const meta = await res.json();
     renderSourceMeta(meta, new Date());
@@ -228,15 +250,23 @@ function renderPreview(htmlContent) {
 }
 
 function renderGroundingSummary(payload) {
-  const docUrl = sourceMeta?.source?.doc_url;
+  const docUrl = payload?.source_doc_url || sourceMeta?.source?.doc_url;
   const mode = payload?.grounding_mode || sourceMeta?.grounding_mode || "unknown";
   const warnings = payload?.grounding_warnings || [];
   const sourceTitle = payload?.source_title || sourceMeta?.source?.title || "Source";
   const lastReviewed = payload?.source_last_reviewed || sourceMeta?.source?.last_reviewed || "unknown";
+  const sourceVersion = payload?.source_version || sourceMeta?.source?.version;
+  const modifiedTime = payload?.source_modified_time || sourceMeta?.source?.modified_time;
+  const checkedAt = payload?.source_checked_at || sourceMeta?.source?.checked_at;
   const badgeClass = mode === "live" ? "live" : "fallback";
   const renderNote = payload?.render_origin === "local-reference"
     ? " Rendered with the local reference template."
     : "";
+  const versionNote = sourceVersion && sourceVersion !== "Unknown" ? ` Version ${sourceVersion}.` : "";
+  const modifiedNote = modifiedTime && modifiedTime !== "Unknown"
+    ? ` Updated ${formatSourceTimestamp(modifiedTime, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`
+    : "";
+  const checkedNote = checkedAt ? ` Checked ${formatSourceTimestamp(checkedAt, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.` : "";
   const linkedTitle = docUrl
     ? `<a href="${docUrl}" target="_blank" rel="noopener noreferrer">${sourceTitle}</a>`
     : sourceTitle;
@@ -246,7 +276,7 @@ function renderGroundingSummary(payload) {
       <p class="grounding-summary-title">Grounded for this run</p>
       <span class="grounding-summary-badge ${badgeClass}">${mode}</span>
     </div>
-    <p class="grounding-summary-copy">Source: ${linkedTitle}. Last reviewed ${lastReviewed}.${renderNote} ${payload?.request_id ? `Request ID: ${payload.request_id}.` : ""}</p>
+    <p class="grounding-summary-copy">Source: ${linkedTitle}. Last reviewed ${lastReviewed}.${versionNote}${modifiedNote}${checkedNote}${renderNote} ${payload?.request_id ? `Request ID: ${payload.request_id}.` : ""}</p>
     ${warnings.length ? `<ul class="grounding-warning-list">${warnings.map((warning) => `<li>${warning}</li>`).join("")}</ul>` : ""}
   `;
   els.groundingSummary.classList.remove("hidden");
