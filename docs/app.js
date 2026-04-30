@@ -638,17 +638,17 @@ const DEFAULT_FOOTER_QUOTE = {
 function buildReferenceStyles() {
   return `
     :root {
-      --navy: #253742;
+      --navy: #2e3a41;
       --slate: #445664;
-      --mist: #eef3f5;
-      --paper: #f7f3eb;
-      --sand: #fbf8f2;
-      --line: #dbe3e6;
-      --coral: #eb7148;
-      --coral-soft: #fff1ea;
+      --mist: #c1d3dd;
+      --paper: #ffffff;
+      --sand: #efefef;
+      --line: rgba(68, 86, 100, 0.18);
+      --coral: #ff7f50;
+      --coral-soft: rgba(255, 127, 80, 0.12);
       --white: #ffffff;
-      --ink: #18262e;
-      --muted: #5f7078;
+      --ink: #000000;
+      --muted: #445664;
       --radius: 22px;
     }
     * { box-sizing: border-box; }
@@ -667,15 +667,15 @@ function buildReferenceStyles() {
       position: relative;
       overflow: hidden;
       background:
-        radial-gradient(circle at top right, rgba(235, 113, 72, 0.10), transparent 20rem),
-        linear-gradient(180deg, #ffffff 0%, #fbfaf7 100%);
+        radial-gradient(circle at top right, rgba(255, 127, 80, 0.12), transparent 20rem),
+        linear-gradient(180deg, #ffffff 0%, rgba(239, 239, 239, 0.62) 100%);
       page-break-after: always;
     }
     .page:last-child { page-break-after: auto; }
     .page.secondary {
       background:
         radial-gradient(circle at top left, rgba(193, 211, 221, 0.26), transparent 18rem),
-        linear-gradient(180deg, #f8fafb 0%, #edf3f5 100%);
+        linear-gradient(180deg, #ffffff 0%, rgba(239, 239, 239, 0.82) 100%);
     }
     .header {
       display: flex;
@@ -767,14 +767,14 @@ function buildReferenceStyles() {
     .hero-card {
       padding: 20px 22px;
       background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 241, 234, 0.78));
+        linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 127, 80, 0.10));
     }
     .meta-card {
       padding: 18px;
       background:
-        linear-gradient(180deg, rgba(37, 55, 66, 0.98), rgba(68, 86, 100, 0.96));
+        linear-gradient(180deg, rgba(46, 58, 65, 0.98), rgba(68, 86, 100, 0.96));
       color: var(--white);
-      border-color: rgba(37, 55, 66, 0.08);
+      border-color: rgba(46, 58, 65, 0.08);
     }
     .meta-card .section-kicker,
     .meta-card p,
@@ -929,7 +929,7 @@ function buildReferenceStyles() {
       border-radius: 18px;
       padding: 16px;
       border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(238, 243, 245, 0.68));
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(193, 211, 221, 0.22));
     }
     .proof-card-top {
       display: flex;
@@ -987,7 +987,7 @@ function buildReferenceStyles() {
       margin-top: 14px;
       padding: 16px 18px;
       background:
-        linear-gradient(90deg, rgba(235, 113, 72, 0.12), rgba(235, 113, 72, 0.03));
+        linear-gradient(90deg, rgba(255, 127, 80, 0.12), rgba(255, 127, 80, 0.03));
       border-left: 4px solid var(--coral);
     }
     .quote-rail p {
@@ -1013,7 +1013,7 @@ function buildReferenceStyles() {
       align-items: center;
       gap: 18px;
       background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(238, 243, 245, 0.95));
+        linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(239, 239, 239, 0.95));
     }
     .cta-card strong {
       display: block;

@@ -1,13 +1,14 @@
 :root {
-  --paper: #f7f3eb;
-  --ink: #111111;
+  --paper: #ffffff;
+  --light-gray: #efefef;
+  --ink: #000000;
   --slate: #2e3a41;
   --steel: #445664;
   --powder: #c1d3dd;
-  --coral: #eb7148;
-  --coral-deep: #d95b31;
+  --coral: #ff7f50;
+  --coral-deep: var(--coral);
   --white: #ffffff;
-  --line: rgba(40, 51, 58, 0.10);
+  --line: rgba(68, 86, 100, 0.16);
   --shadow: 0 24px 72px rgba(40, 51, 58, 0.10);
   --radius: 20px;
 }
@@ -19,9 +20,9 @@ body {
   color: var(--ink);
   font-family: "Manrope", sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(235, 113, 72, 0.10), transparent 28%),
+    radial-gradient(circle at top left, rgba(255, 127, 80, 0.12), transparent 28%),
     radial-gradient(circle at bottom right, rgba(193, 211, 221, 0.60), transparent 34%),
-    linear-gradient(180deg, #fbf9f5 0%, var(--paper) 100%);
+    linear-gradient(180deg, var(--white) 0%, var(--light-gray) 100%);
   min-height: 100vh;
 }
 
@@ -89,7 +90,7 @@ button, textarea, input, select { font: inherit; }
   margin-top: 16px;
   padding: 14px 16px;
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(40, 51, 58, 0.96) 0%, rgba(90, 107, 116, 0.94) 100%);
+  background: linear-gradient(180deg, rgba(46, 58, 65, 0.96) 0%, rgba(68, 86, 100, 0.94) 100%);
   color: var(--white);
   display: flex;
   justify-content: space-between;
@@ -251,9 +252,9 @@ select { cursor: pointer; }
 textarea { resize: vertical; min-height: 100px; }
 
 select:focus, input:focus, textarea:focus {
-  outline: 2px solid rgba(235, 113, 72, 0.24);
+  outline: 2px solid rgba(255, 127, 80, 0.24);
   outline-offset: 1px;
-  border-color: rgba(235, 113, 72, 0.42);
+  border-color: rgba(255, 127, 80, 0.42);
 }
 
 /* Format picker */
@@ -279,13 +280,13 @@ select:focus, input:focus, textarea:focus {
 }
 
 .format-option:hover {
-  border-color: rgba(235, 113, 72, 0.30);
+  border-color: rgba(255, 127, 80, 0.30);
   transform: translateY(-1px);
 }
 
 .format-option.selected {
   border-color: var(--coral);
-  background: rgba(235, 113, 72, 0.06);
+  background: rgba(255, 127, 80, 0.06);
 }
 
 .format-icon {
@@ -331,10 +332,10 @@ select:focus, input:focus, textarea:focus {
   border: 0;
   background: var(--coral);
   color: var(--white);
-  box-shadow: 0 14px 30px rgba(235, 113, 72, 0.22);
+  box-shadow: 0 14px 30px rgba(255, 127, 80, 0.22);
 }
 
-.btn-primary:hover { background: var(--coral-deep); transform: translateY(-1px); }
+.btn-primary:hover { background: var(--slate); transform: translateY(-1px); }
 
 .btn-secondary {
   border: 1px solid rgba(90, 107, 116, 0.16);
@@ -358,12 +359,12 @@ button:disabled { cursor: wait; opacity: 0.65; transform: none; }
 }
 
 .status-badge[data-tone="working"] {
-  background: rgba(235, 113, 72, 0.12);
+  background: rgba(255, 127, 80, 0.12);
   color: var(--coral-deep);
 }
 
 .status-badge[data-tone="error"] {
-  background: rgba(217, 91, 49, 0.12);
+  background: rgba(255, 127, 80, 0.12);
   color: var(--coral-deep);
 }
 
@@ -408,7 +409,7 @@ button:disabled { cursor: wait; opacity: 0.65; transform: none; }
   width: 0;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--coral) 0%, #f39b79 100%);
+  background: linear-gradient(90deg, var(--coral) 0%, rgba(255, 127, 80, 0.62) 100%);
   transition: width 260ms ease;
 }
 
@@ -490,7 +491,7 @@ button:disabled { cursor: wait; opacity: 0.65; transform: none; }
 }
 
 .grounding-summary-badge.fallback {
-  background: rgba(217, 91, 49, 0.12);
+  background: rgba(255, 127, 80, 0.12);
   color: var(--coral-deep);
 }
 
@@ -520,7 +521,7 @@ button:disabled { cursor: wait; opacity: 0.65; transform: none; }
   border-radius: 16px;
   overflow: hidden;
   min-height: 400px;
-  background: #f5f2ec;
+  background: var(--light-gray);
 }
 
 .preview-frame iframe {
@@ -577,8 +578,8 @@ button:disabled { cursor: wait; opacity: 0.65; transform: none; }
 }
 
 .q-status.strong { background: rgba(46, 160, 67, 0.12); color: #1a7f37; }
-.q-status.usable { background: rgba(235, 113, 72, 0.12); color: var(--coral-deep); }
-.q-status.needs-work { background: rgba(217, 91, 49, 0.14); color: #b91c1c; }
+.q-status.usable { background: rgba(255, 127, 80, 0.12); color: var(--coral-deep); }
+.q-status.needs-work { background: rgba(255, 127, 80, 0.16); color: var(--slate); }
 
 .q-section { margin-bottom: 12px; }
 
