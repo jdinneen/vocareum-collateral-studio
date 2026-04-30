@@ -77,9 +77,12 @@ function renderSourceMeta(meta, checkedAt = new Date()) {
 
   if (source.doc_url) {
     els.sourceLink.href = source.doc_url;
-    els.sourceLink.classList.remove("hidden");
+    els.sourceLink.hidden = false;
+    els.sourceLink.removeAttribute("aria-disabled");
   } else {
-    els.sourceLink.classList.add("hidden");
+    els.sourceLink.hidden = true;
+    els.sourceLink.setAttribute("aria-disabled", "true");
+    els.sourceLink.removeAttribute("href");
   }
 
   knownProducts = meta.products || [];
@@ -100,6 +103,9 @@ async function loadMeta(options = {}) {
     return meta;
   } catch (err) {
     els.sourceNote.textContent = `Source status unavailable: ${err.message}`;
+    els.sourceLink.hidden = true;
+    els.sourceLink.setAttribute("aria-disabled", "true");
+    els.sourceLink.removeAttribute("href");
     setStatus("Offline", "error");
     throw err;
   }

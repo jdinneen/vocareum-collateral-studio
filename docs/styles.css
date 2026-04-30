@@ -132,6 +132,11 @@ button, textarea, input, select { font: inherit; }
   font-weight: 700;
 }
 
+.source-link[aria-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
 .source-link:hover {
   background: rgba(255, 255, 255, 0.16);
 }
@@ -147,6 +152,10 @@ button, textarea, input, select { font: inherit; }
 }
 
 .hidden {
+  display: none !important;
+}
+
+[hidden] {
   display: none !important;
 }
 
