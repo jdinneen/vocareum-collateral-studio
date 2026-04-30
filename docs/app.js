@@ -37,6 +37,12 @@ const PRODUCT_ALIASES = [
 ];
 
 const RUN_GUARDRAILS = "Use only approved Vocareum product names, proof points, and references from the source catalog. Do not invent named proof headings, customer examples, frameworks, or capability labels.";
+const PACKET_FIELDS = ["Headline", "Subhead", "Stat Bar", "Problem", "How It Works", "Who Uses This", "Proof", "Quote", "CTA"];
+const FIELD_ALIASES = {
+  "Core story": "Problem",
+  "Audience fit": "Who Uses This",
+  "Named public proof": "Proof",
+};
 
 // -- One-pager side picker --------------------------------------------------
 
@@ -236,6 +242,646 @@ function renderGroundingSummary(payload) {
 
 // -- Request shaping --------------------------------------------------------
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function cleanText(value) {
+  return String(value || "")
+    .replace(/\*\*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function splitPipeEntries(value) {
+  return String(value || "")
+    .split("|")
+    .map((item) => cleanText(item))
+    .filter(Boolean);
+}
+
+function parseStatEntries(value) {
+  return splitPipeEntries(value).map((entry) => {
+    const dashIdx = entry.search(/\s[-:]\s/);
+    if (dashIdx === -1) {
+      return { value: entry, label: "" };
+    }
+    return {
+      value: cleanText(entry.slice(0, dashIdx)),
+      label: cleanText(entry.slice(dashIdx + 3)),
+    };
+  });
+}
+
+function parseProofEntries(value) {
+  return splitPipeEntries(value).map((entry) => {
+    const dashIdx = entry.search(/\s[-:]\s/);
+    if (dashIdx === -1) {
+      return { reference: entry, signal: "" };
+    }
+    return {
+      reference: cleanText(entry.slice(0, dashIdx)),
+      signal: cleanText(entry.slice(dashIdx + 3)),
+    };
+  });
+}
+
+function parseContentPacket(text) {
+  if (!text) return null;
+  const fields = {};
+  let current = null;
+
+  text.split(/\r?\n/).forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    const match = trimmed.match(/^([A-Za-z ]+):\s*(.*)$/);
+    if (match) {
+      const rawLabel = cleanText(match[1]);
+      const label = FIELD_ALIASES[rawLabel] || rawLabel;
+      if (PACKET_FIELDS.includes(label)) {
+        current = label;
+        fields[label] = cleanText(match[2]);
+        return;
+      }
+    }
+
+    if (current) {
+      fields[current] = cleanText([fields[current], trimmed].filter(Boolean).join(" "));
+    }
+  });
+
+  if (!fields.Headline || !fields.Subhead) {
+    return null;
+  }
+
+  return {
+    headline: cleanText(fields.Headline),
+    subhead: cleanText(fields.Subhead),
+    stats: parseStatEntries(fields["Stat Bar"]).slice(0, 4),
+    problem: cleanText(fields.Problem),
+    steps: splitPipeEntries(fields["How It Works"]).slice(0, 4),
+    audiences: splitPipeEntries(fields["Who Uses This"]).slice(0, 4),
+    proofs: parseProofEntries(fields.Proof).slice(0, 4),
+    quote: cleanText(fields.Quote),
+    cta: cleanText(fields.CTA),
+  };
+}
+
+function buildStructuredPacketConstraints(side) {
+  const statCount = side === "two-sided" ? "4" : "3 or 4";
+  const proofCount = side === "two-sided" ? "3" : "2 or 3";
+  return [
+    RUN_GUARDRAILS,
+    `Keep the content concise enough for a ${side === "two-sided" ? "two-sided" : "one-sided"} leave-behind.`,
+    "Output plain text only.",
+    "No markdown bold, no bullets, and no numbered lists.",
+    "Use exactly these labels, one per line, in this order: Headline:, Subhead:, Stat Bar:, Problem:, How It Works:, Who Uses This:, Proof:, Quote:, CTA:.",
+    `For Stat Bar use ${statCount} entries separated by | in the format value - label.`,
+    "For How It Works use 3 short actions separated by |.",
+    "For Who Uses This use 3 audiences separated by |.",
+    `For Proof use ${proofCount} entries separated by | in the format reference - signal.`,
+    "If there is no supported quote, write Quote: None.",
+  ].join(" ");
+}
+
+function buildReferenceStyles() {
+  return `
+    :root {
+      --dark: #2e3a41;
+      --steel: #445664;
+      --powder: #c1d3dd;
+      --light: #efefef;
+      --coral: #ff7f50;
+      --white: #ffffff;
+      --ink: #111111;
+      --paper: #f7f5f1;
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+    }
+    .page {
+      width: 8.5in;
+      min-height: 11in;
+      margin: 0 auto;
+      padding: 0.5in 0.58in;
+      position: relative;
+      overflow: hidden;
+      background: var(--white);
+      page-break-after: always;
+    }
+    .page:last-child { page-break-after: auto; }
+    .page.dark {
+      background:
+        radial-gradient(circle at top right, rgba(255, 127, 80, 0.18), transparent 24rem),
+        linear-gradient(180deg, #36444d 0%, #273239 100%);
+      color: var(--white);
+    }
+    .page.dark p,
+    .page.dark li,
+    .page.dark td { color: var(--powder); }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .brand {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--steel);
+    }
+    .page.dark .brand { color: var(--powder); }
+    .label {
+      display: inline-block;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: var(--dark);
+      color: var(--white);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .page.dark .label {
+      background: var(--coral);
+      color: var(--dark);
+    }
+    h1, h2 {
+      margin: 0;
+      font-family: "Iowan Old Style", Georgia, serif;
+      letter-spacing: -0.04em;
+    }
+    h1 {
+      font-size: 42px;
+      line-height: 0.96;
+      color: var(--dark);
+      margin-bottom: 12px;
+    }
+    h2 {
+      font-size: 31px;
+      line-height: 1;
+      margin-bottom: 10px;
+      color: inherit;
+    }
+    .page.dark h1,
+    .page.dark h2 { color: var(--white); }
+    .subhead {
+      max-width: 6.8in;
+      font-size: 17px;
+      line-height: 1.45;
+      color: var(--steel);
+      margin-bottom: 20px;
+    }
+    .page.dark .subhead { color: var(--powder); }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat {
+      border-radius: var(--radius);
+      background: var(--light);
+      border: 1px solid #dbe1e4;
+      padding: 15px 14px 14px;
+      min-height: 92px;
+    }
+    .stat strong {
+      display: block;
+      font-size: 27px;
+      line-height: 1;
+      color: var(--dark);
+      margin-bottom: 6px;
+    }
+    .stat span {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--steel);
+      font-weight: 700;
+      line-height: 1.35;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.08fr 0.92fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .panel {
+      border-radius: var(--radius);
+      border: 1px solid #d9dfe3;
+      background: var(--white);
+      padding: 18px;
+    }
+    .section-kicker {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--coral);
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .panel p,
+    .panel li {
+      font-size: 14px;
+      line-height: 1.48;
+      color: #253037;
+    }
+    .panel p { margin: 0 0 10px; }
+    .page.dark .panel {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+    .page.dark .panel p,
+    .page.dark .panel li { color: var(--powder); }
+    .step-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .step {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      border-radius: 14px;
+      background: #f7f8f9;
+      border: 1px solid #d8dee2;
+      padding: 14px;
+    }
+    .step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--coral);
+      color: var(--white);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .step-copy {
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--dark);
+    }
+    .audience-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .audience-card {
+      border-radius: 18px;
+      padding: 18px 16px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .audience-card h3 {
+      margin: 0 0 9px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--coral);
+    }
+    .audience-card p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      line-height: 1.42;
+    }
+    th {
+      text-align: left;
+      padding: 10px 10px 8px;
+      background: var(--steel);
+      color: var(--white);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    td {
+      padding: 10px;
+      vertical-align: top;
+      border-bottom: 1px solid #dce2e5;
+      color: #253037;
+      background: rgba(255, 255, 255, 0.88);
+    }
+    tr:nth-child(even) td { background: #f7f8f9; }
+    .page.dark th {
+      background: rgba(193, 211, 221, 0.16);
+      color: var(--white);
+    }
+    .page.dark td {
+      border-bottom-color: rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .page.dark tr:nth-child(even) td { background: rgba(255, 255, 255, 0.03); }
+    .quote {
+      border-left: 4px solid var(--coral);
+      padding: 14px 16px;
+      border-radius: 0 16px 16px 0;
+      background: rgba(193, 211, 221, 0.22);
+      margin-top: 18px;
+      margin-bottom: 18px;
+    }
+    .page.dark .quote { background: rgba(255, 255, 255, 0.08); }
+    .quote p {
+      margin: 0 0 8px;
+      font-size: 17px;
+      line-height: 1.4;
+      font-family: "Iowan Old Style", Georgia, serif;
+      color: inherit;
+    }
+    .quote span {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--steel);
+      font-weight: 700;
+    }
+    .page.dark .quote span { color: var(--powder); }
+    .cta {
+      margin-top: auto;
+      border-radius: 20px;
+      padding: 20px 22px;
+      background: linear-gradient(135deg, rgba(255, 127, 80, 0.95), rgba(255, 165, 120, 0.95));
+      color: var(--dark);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+    }
+    .cta strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1;
+      margin-bottom: 6px;
+      font-family: "Iowan Old Style", Georgia, serif;
+    }
+    .cta p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.45;
+      color: #2e3a41;
+    }
+    .cta .url {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .footer {
+      position: absolute;
+      left: 0.58in;
+      right: 0.58in;
+      bottom: 0.36in;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--steel);
+    }
+    .page.dark .footer { color: var(--powder); }
+    @page {
+      size: letter;
+      margin: 0;
+    }
+  `;
+}
+
+function renderStats(stats) {
+  return stats.map((item) => `
+    <div class="stat">
+      <strong>${escapeHtml(item.value)}</strong>
+      <span>${escapeHtml(item.label || "Approved public stat")}</span>
+    </div>
+  `).join("");
+}
+
+function renderSteps(steps) {
+  return steps.map((step, index) => `
+    <div class="step">
+      <div class="step-num">${index + 1}</div>
+      <div class="step-copy">${escapeHtml(step)}</div>
+    </div>
+  `).join("");
+}
+
+function renderAudienceCards(audiences) {
+  return audiences.map((audience) => `
+    <div class="audience-card">
+      <h3>${escapeHtml(audience)}</h3>
+      <p>Use this message when this group owns policy, access, rollout, or governed delivery inside the institution.</p>
+    </div>
+  `).join("");
+}
+
+function renderProofRows(proofs) {
+  return proofs.map((proof) => `
+    <tr>
+      <td>${escapeHtml(proof.reference)}</td>
+      <td>${escapeHtml(proof.signal)}</td>
+    </tr>
+  `).join("");
+}
+
+function renderQuoteBlock(quote) {
+  if (!quote || quote.toLowerCase() === "none") return "";
+  return `
+    <div class="quote">
+      <p>${escapeHtml(quote)}</p>
+      <span>Approved public quote</span>
+    </div>
+  `;
+}
+
+function buildReferenceHeader(meta, labelText) {
+  const productLabel = meta.products.length ? meta.products.join(" + ") : "Vocareum One-Pager";
+  return `
+    <div class="header">
+      <div class="brand">Vocareum | ${escapeHtml(productLabel)}</div>
+      <div class="label">${escapeHtml(labelText)}</div>
+    </div>
+  `;
+}
+
+function renderReferenceOnePager(packet, meta) {
+  const quoteBlock = renderQuoteBlock(packet.quote);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(packet.headline)}</title>
+  <style>${buildReferenceStyles()}</style>
+</head>
+<body>
+  <section class="page">
+    ${buildReferenceHeader(meta, "One-Sided")}
+    <div class="section-kicker">Reference one-pager render</div>
+    <h1>${escapeHtml(packet.headline)}</h1>
+    <p class="subhead">${escapeHtml(packet.subhead)}</p>
+
+    <div class="stats">${renderStats(packet.stats)}</div>
+
+    <div class="grid">
+      <div class="panel">
+        <div class="section-kicker">What the room needs</div>
+        <p>${escapeHtml(packet.problem)}</p>
+        <div class="step-list">${renderSteps(packet.steps)}</div>
+      </div>
+
+      <div class="panel">
+        <div class="section-kicker">Who this fits</div>
+        <p>${escapeHtml(packet.audiences.join(" | "))}</p>
+        <div class="section-kicker" style="margin-top:16px;">Named public proof</div>
+        <table>
+          <tr>
+            <th>Reference</th>
+            <th>Signal</th>
+          </tr>
+          ${renderProofRows(packet.proofs)}
+        </table>
+      </div>
+    </div>
+
+    ${quoteBlock}
+
+    <div class="cta">
+      <div>
+        <strong>One governed story.</strong>
+        <p>${escapeHtml(packet.cta)}</p>
+      </div>
+      <div class="url">vocareum.com</div>
+    </div>
+
+    <div class="footer">
+      <span>vocareum.com</span>
+      <span>01</span>
+    </div>
+  </section>
+</body>
+</html>`;
+}
+
+function renderReferenceTwoPager(packet, meta) {
+  const quoteBlock = renderQuoteBlock(packet.quote);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(packet.headline)}</title>
+  <style>${buildReferenceStyles()}</style>
+</head>
+<body>
+  <section class="page">
+    ${buildReferenceHeader(meta, "Side 1")}
+    <div class="section-kicker">Front side</div>
+    <h1>${escapeHtml(packet.headline)}</h1>
+    <p class="subhead">${escapeHtml(packet.subhead)}</p>
+
+    <div class="stats">${renderStats(packet.stats)}</div>
+
+    <div class="grid">
+      <div class="panel">
+        <div class="section-kicker">Core story</div>
+        <p>${escapeHtml(packet.problem)}</p>
+      </div>
+      <div class="panel">
+        <div class="section-kicker">Operational fit</div>
+        <p>${escapeHtml(packet.audiences.join(" | "))}</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-kicker">How it works</div>
+      <div class="step-list">${renderSteps(packet.steps)}</div>
+    </div>
+
+    <div class="footer">
+      <span>vocareum.com</span>
+      <span>01</span>
+    </div>
+  </section>
+
+  <section class="page dark">
+    ${buildReferenceHeader(meta, "Side 2")}
+    <div class="section-kicker">Back side</div>
+    <h2>Why this resonates in the room.</h2>
+    <p class="subhead">${escapeHtml(packet.subhead)}</p>
+
+    <div class="audience-grid">${renderAudienceCards(packet.audiences)}</div>
+
+    <div class="section-kicker">Named public proof</div>
+    <table>
+      <tr>
+        <th>Reference</th>
+        <th>What it proves</th>
+      </tr>
+      ${renderProofRows(packet.proofs)}
+    </table>
+
+    ${quoteBlock}
+
+    <div class="cta">
+      <div>
+        <strong>Use this to move the next conversation.</strong>
+        <p>${escapeHtml(packet.cta)}</p>
+      </div>
+      <div class="url">vocareum.com</div>
+    </div>
+
+    <div class="footer">
+      <span>vocareum.com</span>
+      <span>02</span>
+    </div>
+  </section>
+</body>
+</html>`;
+}
+
+function applyReferenceRender(payload, requestMeta) {
+  const packet = parseContentPacket(payload.output);
+  if (!packet) return payload;
+
+  const html = requestMeta.side === "two-sided"
+    ? renderReferenceTwoPager(packet, requestMeta)
+    : renderReferenceOnePager(packet, requestMeta);
+
+  return {
+    ...payload,
+    rendered_html: html,
+    rendered_kind: "one-pager",
+    rendered_title: packet.headline || payload.rendered_title || "vocareum_one_pager",
+  };
+}
+
 function normalizeText(value) {
   return (value || "")
     .toLowerCase()
@@ -277,16 +923,17 @@ function buildRequestFromForm() {
     return { error: "Name at least one Vocareum product directly in the brief." };
   }
 
-  const layoutInstruction = selectedSide === "two-sided"
-    ? "Layout: two-sided one-pager."
-    : "Layout: one-sided one-pager.";
-
   return {
     asset_type: "one-pager",
     product: matchedProducts.length ? matchedProducts.join(", ") : brief,
     audience: buildAudienceSummary(brief),
-    objective: brief,
-    extra_constraints: `${layoutInstruction} ${RUN_GUARDRAILS}`,
+    objective: `Create a concise one-pager content packet based on this brief: ${brief}`,
+    extra_constraints: buildStructuredPacketConstraints(selectedSide),
+    _meta: {
+      brief,
+      matchedProducts,
+      side: selectedSide,
+    },
   };
 }
 
@@ -300,6 +947,7 @@ async function generate(event) {
     setStatus(request.error, "error");
     return;
   }
+  const { _meta: requestMeta, ...apiRequest } = request;
 
   setLoading(true);
   els.resultSection.classList.remove("hidden");
@@ -318,10 +966,11 @@ async function generate(event) {
     const res = await fetch(`${API}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
+      body: JSON.stringify(apiRequest),
     });
-    const payload = await res.json();
-    if (!res.ok) throw new Error(formatError(payload.detail));
+    const rawPayload = await res.json();
+    if (!res.ok) throw new Error(formatError(rawPayload.detail));
+    const payload = applyReferenceRender(rawPayload, requestMeta);
 
     lastResult = payload;
     els.rawOutput.textContent = payload.output;
@@ -361,12 +1010,13 @@ async function improve() {
   if (!lastResult) return;
 
   const rating = 3;
-  const notes = "Make it sharper, more specific, and tighter.";
+  const notes = "Make it sharper, more specific, and tighter while keeping the exact labeled packet structure and named public proof format.";
   const request = buildRequestFromForm();
   if (request.error) {
     setStatus(request.error, "error");
     return;
   }
+  const { _meta: requestMeta, ...apiRequest } = request;
 
   setLoading(true);
 
@@ -376,14 +1026,15 @@ async function improve() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        request,
+        request: apiRequest,
         current_output: lastResult.output,
         rating: rating,
         notes: notes,
       }),
     });
-    const payload = await res.json();
-    if (!res.ok) throw new Error(formatError(payload.detail));
+    const rawPayload = await res.json();
+    if (!res.ok) throw new Error(formatError(rawPayload.detail));
+    const payload = applyReferenceRender(rawPayload, requestMeta);
 
     lastResult = payload;
     els.rawOutput.textContent = payload.output;
