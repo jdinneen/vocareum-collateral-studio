@@ -1009,13 +1009,10 @@ function buildRequestFromForm() {
   }
 
   const matchedProducts = inferProductsFromBrief(brief);
-  if (knownProducts.length && !matchedProducts.length) {
-    return { error: "Name at least one Vocareum product directly in the brief." };
-  }
 
   return {
     asset_type: "one-pager",
-    product: matchedProducts.length ? matchedProducts.join(", ") : brief,
+    product: matchedProducts.length ? matchedProducts.join(", ") : "",
     audience: inferAudienceFromBrief(brief, matchedProducts),
     objective: `Create a concise one-pager content packet based on this brief: ${brief}`,
     extra_constraints: buildStructuredPacketConstraints(selectedSide),
