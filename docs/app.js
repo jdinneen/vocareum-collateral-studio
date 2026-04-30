@@ -505,34 +505,43 @@ function parseContentPacket(text) {
     }
   });
 
-  if (!fields.Headline || !fields.Subhead || !fields.Problem || !fields["How It Works"] || !fields["Who Uses This"] || !fields.Proof || !fields.CTA) {
+  if (!fields.Headline || !fields.Subhead || !fields.Problem || !fields["How It Works"]) {
     return null;
   }
+
+  const audienceLine = cleanText(fields.Audience).replace(/^For\s+/i, "").replace(/\.$/, "");
+  const audiences = fields["Who Uses This"]
+    ? splitPipeEntries(fields["Who Uses This"]).slice(0, 4)
+    : audienceLine
+      ? [audienceLine]
+      : ["Teams evaluating Vocareum AI products"];
+  const proofs = fields.Proof ? parseProofEntries(fields.Proof).slice(0, 4) : [];
+  const stats = parseStatEntries(fields["Stat Bar"]).slice(0, 4);
 
   return {
     audienceEyebrow: cleanText(fields.Audience),
     headline: cleanText(fields.Headline),
     subhead: cleanText(fields.Subhead),
-    stats: parseStatEntries(fields["Stat Bar"]).slice(0, 4),
+    stats,
     problem: cleanText(fields.Problem),
     steps: splitPipeEntries(fields["How It Works"]).slice(0, 4),
-    audiences: splitPipeEntries(fields["Who Uses This"]).slice(0, 4),
-    proofs: parseProofEntries(fields.Proof).slice(0, 4),
+    audiences,
+    proofs,
     proofCards: [],
-    logoStrip: DEFAULT_LOGO_STRIP,
+    logoStrip: [],
     credibilityBar: [
       "5M+ total platform learners",
       "7,000+ institutions and organizations",
       "SOC 2 Type II, FERPA, GDPR",
       "AWS, Azure, GCP, Databricks",
     ],
-    footerQuote: DEFAULT_FOOTER_QUOTE,
+    footerQuote: null,
     audienceHeading: "Best fit",
     problemHeading: "Why this matters",
     stepsHeading: "How Vocareum helps",
     proofHeading: "Why believe this",
     ctaLabel: "Next business step",
-    cta: cleanText(fields.CTA),
+    cta: cleanText(fields.CTA) || "Review which Vocareum AI product fits your workflow.",
   };
 }
 
@@ -1767,7 +1776,7 @@ function applyReferenceRender(payload, requestMeta) {
     audiences: sanitizeAudienceEntries(fallbackPacket.audiences, requestMeta?.audience || ""),
     proofs: sanitizeProofEntries(fallbackPacket.proofs),
     proofCards: [],
-    logoStrip: DEFAULT_LOGO_STRIP,
+    logoStrip: [],
     credibilityBar: [
       "5M+ total platform learners",
       "7,000+ institutions and organizations",
@@ -1780,7 +1789,7 @@ function applyReferenceRender(payload, requestMeta) {
     stepsHeading: "How Vocareum helps",
     proofHeading: "Why believe this",
     ctaLabel: "Next business step",
-    footerQuote: DEFAULT_FOOTER_QUOTE,
+    footerQuote: null,
   };
 
   const html = requestMeta.side === "two-sided"
