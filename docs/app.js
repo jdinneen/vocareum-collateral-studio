@@ -550,6 +550,7 @@ function normalizeQuoteObject(value) {
 function normalizeBackendPacket(packet) {
   if (!packet || typeof packet !== "object") return null;
   if (!packet.headline || !packet.subhead || !packet.problem || !packet.cta) return null;
+  const hasFooterQuote = Object.prototype.hasOwnProperty.call(packet, "footer_quote");
 
   return {
     audienceEyebrow: cleanText(packet.audience_eyebrow || packet.audience),
@@ -593,7 +594,7 @@ function normalizeBackendPacket(packet) {
           "SOC 2 Type II, FERPA, GDPR",
           "AWS, Azure, GCP, Databricks",
         ],
-    footerQuote: normalizeQuoteObject(packet.footer_quote) || DEFAULT_FOOTER_QUOTE,
+    footerQuote: hasFooterQuote ? normalizeQuoteObject(packet.footer_quote) : DEFAULT_FOOTER_QUOTE,
     audienceHeading: cleanText(packet.audience_heading) || "Best fit",
     problemHeading: cleanText(packet.problem_heading) || "Why this matters",
     stepsHeading: cleanText(packet.steps_heading) || "How Vocareum helps",
@@ -1442,8 +1443,11 @@ function buildAudienceRows(packet) {
 
   const unique = [];
   const seen = new Set();
+  const primary = rows[0]?.persona?.toLowerCase() || "";
   for (const row of rows) {
     const key = row.persona.toLowerCase();
+    if (primary && key !== primary && key.startsWith(`${primary} -`)) continue;
+    if (primary && key !== primary && key.startsWith(`${primary}:`)) continue;
     if (seen.has(key)) continue;
     seen.add(key);
     unique.push(row);
@@ -1477,14 +1481,6 @@ function buildProofSummary(packet) {
     return {
       lead: card.organization,
       body: detail ? `${detail}.` : "Named public proof in the approved catalog.",
-    };
-  }
-
-  if (Array.isArray(packet.proofs) && packet.proofs.length) {
-    const proof = packet.proofs[0];
-    return {
-      lead: proof.reference,
-      body: cleanText(proof.signal) || "Named public proof in the approved catalog.",
     };
   }
 
