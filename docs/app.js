@@ -10,6 +10,10 @@ const els = {
   brief: document.getElementById("briefInput"),
   generateBtn: document.getElementById("generateBtn"),
   statusBadge: document.getElementById("statusBadge"),
+  runProgress: document.getElementById("runProgress"),
+  runProgressLabel: document.getElementById("runProgressLabel"),
+  runProgressMeta: document.getElementById("runProgressMeta"),
+  runProgressBar: document.getElementById("runProgressBar"),
   sourceNote: document.getElementById("sourceNote"),
   sourceLink: document.getElementById("sourceLink"),
   refreshSourceBtn: document.getElementById("refreshSourceBtn"),
@@ -28,6 +32,25 @@ let selectedSide = "one-sided";
 let lastResult = null;
 let knownProducts = [];
 let sourceMeta = null;
+let progressTimer = null;
+let progressStartedAt = 0;
+
+const RUN_PROGRESS_PHASES = {
+  generate: [
+    { pct: 8, label: "Preparing brief" },
+    { pct: 24, label: "Grounding request" },
+    { pct: 54, label: "Drafting one-pager" },
+    { pct: 80, label: "Reviewing buyer and proof fit" },
+    { pct: 94, label: "Rendering preview" },
+  ],
+  improve: [
+    { pct: 8, label: "Preparing revision" },
+    { pct: 28, label: "Reviewing current draft" },
+    { pct: 58, label: "Rewriting and tightening" },
+    { pct: 82, label: "Checking grounded changes" },
+    { pct: 94, label: "Rendering preview" },
+  ],
+};
 
 const PRODUCT_ALIASES = [
   { canonical: "AI Compass", patterns: ["ai compass", "compass"] },
@@ -100,11 +123,59 @@ function setStatus(text, tone) {
   els.statusBadge.dataset.tone = tone || "";
 }
 
-function setLoading(on) {
+function setLoading(on, statusText = on ? "Generating…" : "Ready") {
   els.generateBtn.disabled = on;
   els.improveBtn.disabled = on;
   els.refreshSourceBtn.disabled = on;
-  setStatus(on ? "Generating\u2026" : "Ready", on ? "working" : "success");
+  setStatus(statusText, on ? "working" : "success");
+}
+
+function renderRunProgress(percent, label, metaText) {
+  els.runProgress.classList.remove("hidden");
+  els.runProgressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+  els.runProgressLabel.textContent = label;
+  els.runProgressMeta.textContent = metaText;
+}
+
+function stopRunProgress() {
+  if (progressTimer) {
+    clearInterval(progressTimer);
+    progressTimer = null;
+  }
+}
+
+function startRunProgress(mode) {
+  stopRunProgress();
+  const phases = RUN_PROGRESS_PHASES[mode] || RUN_PROGRESS_PHASES.generate;
+  let percent = phases[0].pct;
+  progressStartedAt = Date.now();
+
+  const tick = () => {
+    const elapsedSec = Math.max(0, Math.round((Date.now() - progressStartedAt) / 1000));
+    percent = Math.min(94, percent + (percent < 28 ? 4 : percent < 72 ? 3 : 1.5));
+    let active = phases[0];
+    for (const phase of phases) {
+      if (percent >= phase.pct) active = phase;
+    }
+    renderRunProgress(percent, active.label, `${elapsedSec}s elapsed`);
+  };
+
+  tick();
+  progressTimer = setInterval(tick, 800);
+}
+
+function finishRunProgress(label) {
+  stopRunProgress();
+  const elapsedSec = Math.max(0.5, (Date.now() - progressStartedAt) / 1000);
+  renderRunProgress(100, label, `${elapsedSec.toFixed(1)}s total`);
+  setTimeout(() => {
+    els.runProgress.classList.add("hidden");
+  }, 1200);
+}
+
+function failRunProgress() {
+  stopRunProgress();
+  els.runProgress.classList.add("hidden");
 }
 
 // -- Load metadata ----------------------------------------------------------
@@ -175,14 +246,6 @@ async function loadMeta(options = {}) {
     els.sourceLink.removeAttribute("href");
     setStatus("Offline", "error");
     throw err;
-  }
-}
-
-async function refreshMetaForRun() {
-  try {
-    await loadMeta({ force: true, silent: true });
-  } catch (_) {
-    // Grounding metadata is status-only here; generation should still rely on the backend.
   }
 }
 
@@ -278,9 +341,11 @@ function renderGroundingSummary(payload) {
   const modifiedTime = payload?.source_modified_time || sourceMeta?.source?.modified_time;
   const checkedAt = payload?.source_checked_at || sourceMeta?.source?.checked_at;
   const badgeClass = mode === "live" ? "live" : "fallback";
-  const renderNote = payload?.render_origin === "local-reference"
-    ? " Rendered with the local reference template."
-    : "";
+  const renderNote = payload?.render_origin === "canonical-packet"
+    ? " Rendered from the canonical one-pager packet."
+    : payload?.render_origin === "local-reference"
+      ? " Rendered with the local reference template."
+      : "";
   const versionNote = sourceVersion && sourceVersion !== "Unknown" ? ` Version ${sourceVersion}.` : "";
   const modifiedNote = modifiedTime && modifiedTime !== "Unknown"
     ? ` Updated ${formatSourceTimestamp(modifiedTime, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`
@@ -440,7 +505,7 @@ function parseContentPacket(text) {
     }
   });
 
-  if (!fields.Headline || !fields.Subhead) {
+  if (!fields.Headline || !fields.Subhead || !fields.Problem || !fields["How It Works"] || !fields["Who Uses This"] || !fields.Proof || !fields.CTA) {
     return null;
   }
 
@@ -454,6 +519,33 @@ function parseContentPacket(text) {
     proofs: parseProofEntries(fields.Proof).slice(0, 4),
     quote: cleanText(fields.Quote),
     cta: cleanText(fields.CTA),
+  };
+}
+
+function normalizeBackendPacket(packet) {
+  if (!packet || typeof packet !== "object") return null;
+  if (!packet.headline || !packet.subhead || !packet.problem || !packet.cta) return null;
+
+  return {
+    headline: cleanText(packet.headline),
+    subhead: cleanText(packet.subhead),
+    stats: Array.isArray(packet.stats)
+      ? packet.stats.map((item) => ({
+          value: cleanText(item?.value),
+          label: cleanText(item?.label),
+        })).filter((item) => item.value).slice(0, 4)
+      : [],
+    problem: cleanText(packet.problem),
+    steps: Array.isArray(packet.steps) ? packet.steps.map((item) => cleanText(item)).filter(Boolean).slice(0, 4) : [],
+    audiences: Array.isArray(packet.audiences) ? packet.audiences.map((item) => cleanText(item)).filter(Boolean).slice(0, 4) : [],
+    proofs: Array.isArray(packet.proofs)
+      ? packet.proofs.map((item) => ({
+          reference: cleanText(item?.reference),
+          signal: cleanText(item?.signal),
+        })).filter((item) => item.reference).slice(0, 4)
+      : [],
+    quote: cleanText(packet.quote),
+    cta: cleanText(packet.cta),
   };
 }
 
@@ -1013,25 +1105,30 @@ function renderReferenceTwoPager(packet, meta) {
 }
 
 function applyReferenceRender(payload, requestMeta) {
-  const packet = parseContentPacket(payload.output);
+  const canonicalPacket = normalizeBackendPacket(payload.content_packet);
+  const fallbackPacket = canonicalPacket ? null : parseContentPacket(payload.output);
+  const packet = canonicalPacket || fallbackPacket;
   if (!packet) return payload;
-  const sanitizedPacket = {
-    ...packet,
-    audiences: sanitizeAudienceEntries(packet.audiences, requestMeta?.audience || ""),
-    proofs: sanitizeProofEntries(packet.proofs),
-    quote: isNoneLike(packet.quote) ? "" : packet.quote,
+  const preparedPacket = canonicalPacket ? {
+    ...canonicalPacket,
+    quote: isNoneLike(canonicalPacket.quote) ? "" : canonicalPacket.quote,
+  } : {
+    ...fallbackPacket,
+    audiences: sanitizeAudienceEntries(fallbackPacket.audiences, requestMeta?.audience || ""),
+    proofs: sanitizeProofEntries(fallbackPacket.proofs),
+    quote: isNoneLike(fallbackPacket.quote) ? "" : fallbackPacket.quote,
   };
 
   const html = requestMeta.side === "two-sided"
-    ? renderReferenceTwoPager(sanitizedPacket, requestMeta)
-    : renderReferenceOnePager(sanitizedPacket, requestMeta);
+    ? renderReferenceTwoPager(preparedPacket, requestMeta)
+    : renderReferenceOnePager(preparedPacket, requestMeta);
 
   return {
     ...payload,
     rendered_html: html,
     rendered_kind: "one-pager",
-    rendered_title: sanitizedPacket.headline || payload.rendered_title || "vocareum_one_pager",
-    render_origin: "local-reference",
+    rendered_title: preparedPacket.headline || payload.rendered_title || "vocareum_one_pager",
+    render_origin: payload.content_packet ? "canonical-packet" : "local-reference",
   };
 }
 
@@ -1144,7 +1241,8 @@ async function generate(event) {
   }
   const { _meta: requestMeta, ...apiRequest } = request;
 
-  setLoading(true);
+  setLoading(true, "Generating…");
+  startRunProgress("generate");
   els.resultSection.classList.remove("hidden");
   els.rawOutput.textContent = "Generating\u2026";
   els.groundingSummary.classList.add("hidden");
@@ -1157,7 +1255,6 @@ async function generate(event) {
   document.getElementById("previewPanel").classList.add("active");
 
   try {
-    await refreshMetaForRun();
     const res = await fetch(`${API}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1179,9 +1276,11 @@ async function generate(event) {
 
     renderQuality(payload.quality_report);
 
+    finishRunProgress("Ready");
     setStatus(`Done in ${(payload.duration_ms / 1000).toFixed(1)}s`, "success");
   } catch (err) {
     lastResult = null;
+    failRunProgress();
     els.rawOutput.textContent = `Error:\n${err.message}`;
     els.previewFrame.innerHTML = `<div style="padding:24px;color:var(--coral-deep);font-size:0.95rem;line-height:1.6">
       <strong>Generation failed</strong><br>${err.message.replace(/\n/g, "<br>")}
@@ -1213,10 +1312,10 @@ async function improve() {
   }
   const { _meta: requestMeta, ...apiRequest } = request;
 
-  setLoading(true);
+  setLoading(true, "Improving…");
+  startRunProgress("improve");
 
   try {
-    await refreshMetaForRun();
     const res = await fetch(`${API}/api/improve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1243,9 +1342,11 @@ async function improve() {
 
     renderQuality(payload.quality_report);
 
+    finishRunProgress("Revision ready");
     setStatus(`Improved in ${(payload.duration_ms / 1000).toFixed(1)}s`, "success");
   } catch (err) {
     lastResult = null;
+    failRunProgress();
     els.rawOutput.textContent = `Error:\n${err.message}`;
     els.previewFrame.innerHTML = `<div style="padding:24px;color:var(--coral-deep);font-size:0.95rem;line-height:1.6">
       <strong>Improve failed</strong><br>${err.message.replace(/\n/g, "<br>")}
@@ -1309,4 +1410,4 @@ els.refreshSourceBtn.addEventListener("click", async () => {
   }
 });
 
-loadMeta({ force: true }).catch(() => {});
+loadMeta().catch(() => {});

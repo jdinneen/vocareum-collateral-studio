@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=20260430-2">
+  <link rel="stylesheet" href="./styles.css?v=20260430-3">
 </head>
 <body>
   <main class="shell">
@@ -66,6 +66,16 @@
           <button id="generateBtn" class="btn-primary" type="submit">Generate one-pager</button>
           <span id="statusBadge" class="status-badge">Ready</span>
         </div>
+
+        <div id="runProgress" class="run-progress full-width hidden" aria-live="polite">
+          <div class="run-progress-top">
+            <span id="runProgressLabel" class="run-progress-label">Preparing request</span>
+            <span id="runProgressMeta" class="run-progress-meta">0s elapsed</span>
+          </div>
+          <div class="run-progress-track">
+            <div id="runProgressBar" class="run-progress-bar"></div>
+          </div>
+        </div>
       </form>
     </section>
 
@@ -99,6 +109,6 @@
     </section>
   </main>
 
-  <script src="./app.js?v=20260430-8"></script>
+  <script src="./app.js?v=20260430-9"></script>
 </body>
 </html>
