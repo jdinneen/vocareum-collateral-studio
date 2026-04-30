@@ -52,6 +52,25 @@ const FIELD_ALIASES = {
   "Audience fit": "Who Uses This",
   "Named public proof": "Proof",
 };
+const AUDIENCE_STOPWORDS = new Set([
+  "a", "an", "and", "audience", "audiences", "business", "buyers", "buyer",
+  "company", "companies", "context", "department", "departments", "director",
+  "directors", "enterprise", "for", "group", "groups", "industry", "leader",
+  "leaders", "line", "of", "or", "product", "role", "roles", "target", "team",
+  "teams", "the", "title", "titles",
+]);
+const PROOF_PLACEHOLDER_PATTERNS = [
+  /\bsource docs?\b/i,
+  /\bproduct catalog\b/i,
+  /\bapproved catalog\b/i,
+  /\bworkflow\/category\b/i,
+  /\bworkflow category\b/i,
+  /\bcurrent workflow\b/i,
+  /\blive source\b/i,
+  /\bgrounding\b/i,
+  /\blast reviewed\b/i,
+  /\bversion\b/i,
+];
 
 // -- One-pager side picker --------------------------------------------------
 
@@ -300,6 +319,69 @@ function cleanText(value) {
     .trim();
 }
 
+function isNoneLike(value) {
+  return /^(?:none|none\.|n\/a|not available|not applicable|no quote|no proof)$/i.test(cleanText(value));
+}
+
+function meaningfulTokens(value) {
+  return normalizeText(value)
+    .split(" ")
+    .filter((token) => token && !AUDIENCE_STOPWORDS.has(token));
+}
+
+function splitAudienceEntry(value) {
+  const [title, ...detailParts] = String(value || "").split("::");
+  return {
+    title: cleanText(title),
+    detail: cleanText(detailParts.join("::")),
+  };
+}
+
+function formatAudienceInline(value) {
+  const audience = splitAudienceEntry(value);
+  if (!audience.detail) return audience.title;
+  return `${audience.title}: ${audience.detail}`;
+}
+
+function sanitizeAudienceEntries(entries, explicitAudience = "") {
+  const cleaned = entries
+    .map((entry) => cleanText(entry))
+    .filter((entry) => entry && !isNoneLike(entry));
+
+  if (!explicitAudience) return cleaned.slice(0, 4);
+
+  const normalizedAudience = normalizeText(explicitAudience);
+  const audienceTokens = meaningfulTokens(explicitAudience);
+  const overlapping = cleaned.filter((entry) => {
+    const normalizedEntry = normalizeText(entry);
+    if (normalizedAudience && normalizedEntry.includes(normalizedAudience)) return true;
+    const entryTokens = meaningfulTokens(entry);
+    return entryTokens.some((token) => audienceTokens.includes(token));
+  });
+
+  if (overlapping.length) return overlapping.slice(0, 4);
+  return [cleanText(explicitAudience), ...cleaned].filter(Boolean).slice(0, 4);
+}
+
+function isPlaceholderProofEntry(proof) {
+  const reference = cleanText(proof?.reference);
+  const signal = cleanText(proof?.signal);
+  const combined = `${reference} ${signal}`.trim();
+  if (!combined || isNoneLike(reference) || isNoneLike(combined)) return true;
+  return PROOF_PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(combined));
+}
+
+function sanitizeProofEntries(entries) {
+  return entries
+    .map((entry) => ({
+      reference: cleanText(entry?.reference),
+      signal: cleanText(entry?.signal),
+    }))
+    .filter((entry) => entry.reference && entry.signal)
+    .filter((entry) => !isPlaceholderProofEntry(entry))
+    .slice(0, 4);
+}
+
 function splitPipeEntries(value) {
   return String(value || "")
     .split("|")
@@ -386,9 +468,11 @@ function buildStructuredPacketConstraints(side) {
     "Use exactly these labels, one per line, in this order: Headline:, Subhead:, Stat Bar:, Problem:, How It Works:, Who Uses This:, Proof:, Quote:, CTA:.",
     `For Stat Bar use ${statCount} entries separated by | in the format value - label.`,
     "For How It Works use 3 short actions separated by |.",
-    "For Who Uses This use 3 audiences separated by |.",
-    `For Proof use ${proofCount} entries separated by | in the format reference - signal.`,
-    "If there is no supported quote, write Quote: None.",
+    "For Who Uses This use 1 to 3 audiences separated by |. If the brief names one audience, keep it to that audience and the closest matching buyer roles instead of inventing extra sectors.",
+    `For Proof use ${proofCount} approved named public proof entries separated by | in the format reference - signal.`,
+    "If there is no approved named public proof, write Proof: None.",
+    "Never use source docs, catalog dates, workflow/category labels, or grounding metadata as proof.",
+    "If there is no approved public quote, write Quote: None.",
   ].join(" ");
 }
 
@@ -547,6 +631,13 @@ function buildReferenceStyles() {
       color: #253037;
     }
     .panel p { margin: 0 0 10px; }
+    .panel ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+    .panel li + li {
+      margin-top: 8px;
+    }
     .page.dark .panel {
       background: rgba(255, 255, 255, 0.06);
       border-color: rgba(255, 255, 255, 0.12);
@@ -735,12 +826,15 @@ function renderSteps(steps) {
 }
 
 function renderAudienceCards(audiences) {
-  return audiences.map((audience) => `
-    <div class="audience-card">
-      <h3>${escapeHtml(audience)}</h3>
-      <p>Use this message when this group owns policy, access, rollout, or governed delivery inside the institution.</p>
-    </div>
-  `).join("");
+  return audiences.map((entry) => {
+    const audience = splitAudienceEntry(entry);
+    return `
+      <div class="audience-card">
+        <h3>${escapeHtml(audience.title)}</h3>
+        ${audience.detail ? `<p>${escapeHtml(audience.detail)}</p>` : ""}
+      </div>
+    `;
+  }).join("");
 }
 
 function renderProofRows(proofs) {
@@ -753,12 +847,36 @@ function renderProofRows(proofs) {
 }
 
 function renderQuoteBlock(quote) {
-  if (!quote || quote.toLowerCase() === "none") return "";
+  if (!quote || isNoneLike(quote)) return "";
   return `
     <div class="quote">
       <p>${escapeHtml(quote)}</p>
       <span>Approved public quote</span>
     </div>
+  `;
+}
+
+function renderAudienceSection(audiences) {
+  if (!audiences.length) return "";
+  return `
+    <div class="section-kicker">Who uses this</div>
+    <ul>
+      ${audiences.map((entry) => `<li>${escapeHtml(formatAudienceInline(entry))}</li>`).join("")}
+    </ul>
+  `;
+}
+
+function renderProofTable(proofs, signalLabel = "Signal") {
+  if (!proofs.length) return "";
+  return `
+    <div class="section-kicker" style="margin-top:16px;">Named public proof</div>
+    <table>
+      <tr>
+        <th>Reference</th>
+        <th>${escapeHtml(signalLabel)}</th>
+      </tr>
+      ${renderProofRows(proofs)}
+    </table>
   `;
 }
 
@@ -790,7 +908,6 @@ function renderReferenceOnePager(packet, meta) {
 <body>
   <section class="page">
     ${buildReferenceHeader(meta, "One-Sided")}
-    <div class="section-kicker">Reference one-pager render</div>
     <h1>${escapeHtml(packet.headline)}</h1>
     <p class="subhead">${escapeHtml(packet.subhead)}</p>
 
@@ -798,22 +915,14 @@ function renderReferenceOnePager(packet, meta) {
 
     <div class="grid">
       <div class="panel">
-        <div class="section-kicker">What the room needs</div>
+        <div class="section-kicker">Problem</div>
         <p>${escapeHtml(packet.problem)}</p>
         <div class="step-list">${renderSteps(packet.steps)}</div>
       </div>
 
       <div class="panel">
-        <div class="section-kicker">Who this fits</div>
-        <p>${escapeHtml(packet.audiences.join(" | "))}</p>
-        <div class="section-kicker" style="margin-top:16px;">Named public proof</div>
-        <table>
-          <tr>
-            <th>Reference</th>
-            <th>Signal</th>
-          </tr>
-          ${renderProofRows(packet.proofs)}
-        </table>
+        ${renderAudienceSection(packet.audiences)}
+        ${renderProofTable(packet.proofs)}
       </div>
     </div>
 
@@ -821,7 +930,7 @@ function renderReferenceOnePager(packet, meta) {
 
     <div class="cta">
       <div>
-        <strong>One governed story.</strong>
+        <strong>Next step</strong>
         <p>${escapeHtml(packet.cta)}</p>
       </div>
       <div class="url">vocareum.com</div>
@@ -849,7 +958,6 @@ function renderReferenceTwoPager(packet, meta) {
 <body>
   <section class="page">
     ${buildReferenceHeader(meta, "Side 1")}
-    <div class="section-kicker">Front side</div>
     <h1>${escapeHtml(packet.headline)}</h1>
     <p class="subhead">${escapeHtml(packet.subhead)}</p>
 
@@ -857,12 +965,11 @@ function renderReferenceTwoPager(packet, meta) {
 
     <div class="grid">
       <div class="panel">
-        <div class="section-kicker">Core story</div>
+        <div class="section-kicker">Problem</div>
         <p>${escapeHtml(packet.problem)}</p>
       </div>
       <div class="panel">
-        <div class="section-kicker">Operational fit</div>
-        <p>${escapeHtml(packet.audiences.join(" | "))}</p>
+        ${renderAudienceSection(packet.audiences)}
       </div>
     </div>
 
@@ -879,26 +986,18 @@ function renderReferenceTwoPager(packet, meta) {
 
   <section class="page dark">
     ${buildReferenceHeader(meta, "Side 2")}
-    <div class="section-kicker">Back side</div>
-    <h2>Why this resonates in the room.</h2>
+    <h2>${escapeHtml(packet.headline)}</h2>
     <p class="subhead">${escapeHtml(packet.subhead)}</p>
 
-    <div class="audience-grid">${renderAudienceCards(packet.audiences)}</div>
+    ${packet.audiences.length ? `<div class="audience-grid">${renderAudienceCards(packet.audiences)}</div>` : ""}
 
-    <div class="section-kicker">Named public proof</div>
-    <table>
-      <tr>
-        <th>Reference</th>
-        <th>What it proves</th>
-      </tr>
-      ${renderProofRows(packet.proofs)}
-    </table>
+    ${renderProofTable(packet.proofs, "What it proves")}
 
     ${quoteBlock}
 
     <div class="cta">
       <div>
-        <strong>Use this to move the next conversation.</strong>
+        <strong>Next step</strong>
         <p>${escapeHtml(packet.cta)}</p>
       </div>
       <div class="url">vocareum.com</div>
@@ -916,16 +1015,22 @@ function renderReferenceTwoPager(packet, meta) {
 function applyReferenceRender(payload, requestMeta) {
   const packet = parseContentPacket(payload.output);
   if (!packet) return payload;
+  const sanitizedPacket = {
+    ...packet,
+    audiences: sanitizeAudienceEntries(packet.audiences, requestMeta?.audience || ""),
+    proofs: sanitizeProofEntries(packet.proofs),
+    quote: isNoneLike(packet.quote) ? "" : packet.quote,
+  };
 
   const html = requestMeta.side === "two-sided"
-    ? renderReferenceTwoPager(packet, requestMeta)
-    : renderReferenceOnePager(packet, requestMeta);
+    ? renderReferenceTwoPager(sanitizedPacket, requestMeta)
+    : renderReferenceOnePager(sanitizedPacket, requestMeta);
 
   return {
     ...payload,
     rendered_html: html,
     rendered_kind: "one-pager",
-    rendered_title: packet.headline || payload.rendered_title || "vocareum_one_pager",
+    rendered_title: sanitizedPacket.headline || payload.rendered_title || "vocareum_one_pager",
     render_origin: "local-reference",
   };
 }
@@ -1009,15 +1114,17 @@ function buildRequestFromForm() {
   }
 
   const matchedProducts = inferProductsFromBrief(brief);
+  const audience = inferAudienceFromBrief(brief, matchedProducts);
 
   return {
     asset_type: "one-pager",
     product: matchedProducts.length ? matchedProducts.join(", ") : "",
-    audience: inferAudienceFromBrief(brief, matchedProducts),
+    audience,
     objective: `Create a concise one-pager content packet based on this brief: ${brief}`,
     extra_constraints: buildStructuredPacketConstraints(selectedSide),
     _meta: {
       brief,
+      audience,
       matchedProducts,
       products: matchedProducts,
       side: selectedSide,
