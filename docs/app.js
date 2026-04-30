@@ -6,11 +6,8 @@ const API = window.APP_CONFIG.apiBaseUrl;
 
 const els = {
   form: document.getElementById("builderForm"),
-  formatPicker: document.getElementById("formatPicker"),
-  product: document.getElementById("productSelect"),
-  audience: document.getElementById("audienceInput"),
+  sidePicker: document.getElementById("sidePicker"),
   brief: document.getElementById("briefInput"),
-  constraints: document.getElementById("constraintsInput"),
   generateBtn: document.getElementById("generateBtn"),
   statusBadge: document.getElementById("statusBadge"),
   sourceNote: document.getElementById("sourceNote"),
@@ -24,17 +21,18 @@ const els = {
   improveBtn: document.getElementById("improveBtn"),
 };
 
-let selectedFormat = "one-pager";
+let selectedSide = "one-sided";
 let lastResult = null;
+let knownProducts = [];
 
-// -- Format picker ----------------------------------------------------------
+// -- One-pager side picker --------------------------------------------------
 
-els.formatPicker.addEventListener("click", (e) => {
+els.sidePicker.addEventListener("click", (e) => {
   const btn = e.target.closest(".format-option");
   if (!btn) return;
-  els.formatPicker.querySelectorAll(".format-option").forEach((b) => b.classList.remove("selected"));
+  els.sidePicker.querySelectorAll(".format-option").forEach((b) => b.classList.remove("selected"));
   btn.classList.add("selected");
-  selectedFormat = btn.dataset.format;
+  selectedSide = btn.dataset.side;
 });
 
 // -- Tabs -------------------------------------------------------------------
@@ -72,14 +70,7 @@ async function loadMeta() {
     els.sourceNote.textContent = meta.grounding_mode === "live"
       ? `Grounded in the live catalog. Last reviewed ${meta.source.last_reviewed}.`
       : "Using fallback source snapshot (live source unavailable).";
-
-    const products = meta.products || [];
-    products.forEach((name) => {
-      const opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = name;
-      els.product.appendChild(opt);
-    });
+    knownProducts = meta.products || [];
   } catch (err) {
     els.sourceNote.textContent = `Source status unavailable: ${err.message}`;
     setStatus("Offline", "error");
@@ -168,18 +159,57 @@ function renderPreview(htmlContent) {
   iframe.srcdoc = htmlContent;
 }
 
+// -- Request shaping --------------------------------------------------------
+
+function normalizeText(value) {
+  return (value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function inferProductsFromBrief(brief) {
+  const normalizedBrief = normalizeText(brief);
+  if (!normalizedBrief || !knownProducts.length) return [];
+  return knownProducts.filter((name) => normalizedBrief.includes(normalizeText(name)));
+}
+
+function buildAudienceSummary(brief) {
+  return brief.replace(/\s+/g, " ").trim().slice(0, 200);
+}
+
+function buildRequestFromForm() {
+  const brief = els.brief.value.trim();
+  if (!brief) {
+    return { error: "Fill the required brief." };
+  }
+
+  const matchedProducts = inferProductsFromBrief(brief);
+  if (knownProducts.length && !matchedProducts.length) {
+    return { error: "Name at least one Vocareum product directly in the brief." };
+  }
+
+  const layoutInstruction = selectedSide === "two-sided"
+    ? "Layout: two-sided one-pager."
+    : "Layout: one-sided one-pager.";
+
+  return {
+    asset_type: "one-pager",
+    product: matchedProducts.length ? matchedProducts.join(", ") : brief,
+    audience: buildAudienceSummary(brief),
+    objective: brief,
+    extra_constraints: layoutInstruction,
+  };
+}
+
 // -- Generate ---------------------------------------------------------------
 
 async function generate(event) {
   event.preventDefault();
 
-  const product = els.product.value;
-  const audience = els.audience.value.trim();
-  const brief = els.brief.value.trim();
-  const constraints = els.constraints.value.trim();
-
-  if (!product || !audience || !brief) {
-    setStatus("Fill all required fields", "error");
+  const request = buildRequestFromForm();
+  if (request.error) {
+    setStatus(request.error, "error");
     return;
   }
 
@@ -198,13 +228,7 @@ async function generate(event) {
     const res = await fetch(`${API}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        asset_type: selectedFormat,
-        product: product,
-        audience: audience,
-        objective: brief,
-        extra_constraints: constraints,
-      }),
+      body: JSON.stringify(request),
     });
     const payload = await res.json();
     if (!res.ok) throw new Error(formatError(payload.detail));
@@ -245,6 +269,11 @@ async function improve() {
 
   const rating = 3;
   const notes = "Make it sharper, more specific, and tighter.";
+  const request = buildRequestFromForm();
+  if (request.error) {
+    setStatus(request.error, "error");
+    return;
+  }
 
   setLoading(true);
 
@@ -253,13 +282,7 @@ async function improve() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        request: {
-          asset_type: selectedFormat,
-          product: els.product.value,
-          audience: els.audience.value.trim(),
-          objective: els.brief.value.trim(),
-          extra_constraints: els.constraints.value.trim(),
-        },
+        request,
         current_output: lastResult.output,
         rating: rating,
         notes: notes,

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vocareum Collateral Studio</title>
+  <title>Vocareum One-Pager Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -16,58 +16,37 @@
         <span class="brand">Vocareum</span>
         <span class="badge">Collateral Studio</span>
       </div>
-      <h1>Build grounded sales collateral.</h1>
-      <p class="lede">Pick a product, choose a format, describe the audience. Every claim stays inside the approved catalog.</p>
+      <h1>Build grounded one-pagers.</h1>
+      <p class="lede">Choose a one-pager layout, then describe what you need. Every claim stays inside the approved catalog.</p>
       <p id="sourceNote" class="source-note">Loading source status&hellip;</p>
     </header>
 
     <section class="builder">
       <form id="builderForm" class="form-grid">
         <div class="field format-field">
-          <span class="label">Format</span>
-          <div id="formatPicker" class="format-picker">
-            <button type="button" class="format-option selected" data-format="one-pager">
+          <span class="label">One-pager layout</span>
+          <div id="sidePicker" class="format-picker">
+            <button type="button" class="format-option selected" data-side="one-sided">
               <span class="format-icon">&#9634;</span>
-              <span class="format-name">One-pager</span>
-              <span class="format-desc">Hero, stats, problem, steps, proof</span>
+              <span class="format-name">One-sided</span>
+              <span class="format-desc">Front only. Tight hero, proof, CTA.</span>
             </button>
-            <button type="button" class="format-option" data-format="sales-collateral">
+            <button type="button" class="format-option" data-side="two-sided">
               <span class="format-icon">&#9638;</span>
-              <span class="format-name">Overview</span>
-              <span class="format-desc">Capabilities, buyers, proof, CTA</span>
-            </button>
-            <button type="button" class="format-option" data-format="sales-deck-brief">
-              <span class="format-icon">&#9641;</span>
-              <span class="format-name">6-slide deck</span>
-              <span class="format-desc">Presentation outline with bullets</span>
+              <span class="format-name">Two-sided</span>
+              <span class="format-desc">Front and back. More room for proof and detail.</span>
             </button>
           </div>
         </div>
 
-        <div class="field">
-          <label class="label" for="productSelect">Product</label>
-          <select id="productSelect" name="product" required>
-            <option value="">Select a product&hellip;</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label class="label" for="audienceInput">Audience</label>
-          <input id="audienceInput" name="audience" type="text" placeholder="e.g. AWS solutions architects, university CIOs, training program leads" required>
-        </div>
-
         <div class="field full-width">
-          <label class="label" for="briefInput">Brief</label>
-          <textarea id="briefInput" name="brief" rows="5" placeholder="Describe what you need. Include context like the meeting, event, or use case this collateral is for." required></textarea>
-        </div>
-
-        <div class="field full-width">
-          <label class="label" for="constraintsInput">Extra constraints <span class="optional">(optional)</span></label>
-          <input id="constraintsInput" name="constraints" type="text" placeholder="e.g. Must mention AI Gateway integration, keep under 200 words">
+          <label class="label" for="briefInput">Brief <span class="required-mark">*</span></label>
+          <p class="field-note">Required. In 1-2 sentences, include the product or products, the target audience (company / industry &amp; titles), and any other context you want reflected in the one-pager.</p>
+          <textarea id="briefInput" name="brief" rows="5" placeholder="Example: Build a two-sided one-pager for AI Gateway and AI Notebook aimed at Deloitte healthcare practice leaders and enterprise training directors. This is for a follow-up after an AI workforce readiness meeting." required></textarea>
         </div>
 
         <div class="action-row full-width">
-          <button id="generateBtn" class="btn-primary" type="submit">Generate</button>
+          <button id="generateBtn" class="btn-primary" type="submit">Generate one-pager</button>
           <span id="statusBadge" class="status-badge">Ready</span>
         </div>
       </form>

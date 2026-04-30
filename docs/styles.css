@@ -124,6 +124,17 @@ button, textarea, input, select { font: inherit; }
   color: var(--steel);
 }
 
+.required-mark {
+  color: var(--coral-deep);
+}
+
+.field-note {
+  margin: 0;
+  color: var(--steel);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
 .optional { font-weight: 500; text-transform: none; letter-spacing: 0; }
 
 select, input, textarea {
@@ -150,7 +161,7 @@ select:focus, input:focus, textarea:focus {
 
 .format-picker {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
@@ -196,6 +207,7 @@ select:focus, input:focus, textarea:focus {
   color: var(--steel);
   text-align: center;
   line-height: 1.4;
+  max-width: 17ch;
 }
 
 /* Action row */
